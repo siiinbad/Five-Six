@@ -17,5 +17,6 @@ public class Main {
         window.setVisible(true);
 
         gamePanel.startGameThread();
+        //just normal test push hope no conflcit
     }
 }
