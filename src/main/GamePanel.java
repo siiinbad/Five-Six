@@ -1,73 +1,224 @@
 package main;
 
 import entity.Player;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
+import java.util.Objects;
+import javax.imageio.ImageIO;
 import javax.swing.JPanel;
+import panels.SelectCharacter;
 
-public class GamePanel extends JPanel implements Runnable{
-  final int originalTileSize = 16; // 16x16 tile
-  final int scale = 3;
-  
-  public final int tileSize = originalTileSize * scale; // 48x48 tile
-  final int maxScreenCol = 16;
-  final int maxScreenRow = 12;
-  final int screenWidth = tileSize * maxScreenCol; // 768 pixels
-  final int screenHeight = tileSize * maxScreenRow; // 576 pixels
+public class GamePanel extends JPanel implements Runnable {
 
-  int fps = 60;
+    // Tiles
+    final int originalTileSize = 16;
+    final int scale = 10;
+    public final int tileSize = originalTileSize * scale;
+    final int maxScreenCol = 16;
+    final int maxScreenRow = 12;
+    public int screenWidth = tileSize * maxScreenCol;
+    int screenHeight = tileSize * maxScreenRow;
 
-  KeyHandler keyH = new KeyHandler();
-  Thread gameThread;
-  Player player = new Player(this, keyH);
+    int fps = 60;
+    public KeyHandler keyH = new KeyHandler(this);
+    Thread gameThread;
+    public Player player;
 
-  public GamePanel() {
-    this.setPreferredSize(new Dimension(screenWidth, screenHeight));
-    this.setBackground(Color.black);
-    this.setDoubleBuffered(true);
-    this.addKeyListener(keyH);
-    this.setFocusable(true);
-  }
+    BufferedImage mapImage;
 
-  public void startGameThread(){
-    gameThread = new Thread(this);
-    gameThread.start();
-  }
-  
-  @Override
-  public void run() {
-    double drawInterval = 1000000000/fps; // 0.01666 seconds
-    double delta = 0;
-    long lastTime = System.nanoTime();
-    long currentTime;
-    
-    while(gameThread != null){
-        currentTime = System.nanoTime();
-        delta += (currentTime - lastTime) / drawInterval;
-        lastTime = currentTime;
+    // Game states
+    public int gameState;
+    public final int loadingState = 0;
+    public final int titleState = 1;
+    public final int charSelectState = 2;
+    public final int playState = 3;
+    public final int libraryState = 4;
 
-        if(delta >= 1){
-            update();
-            delta = 0;
+    // Menu buttons
+    Rectangle startBtn, selectCharBtn, libraryBtn, exitBtn;
+
+    // Character select screen
+    SelectCharacter charSelect;
+
+    public GamePanel() {
+        this.setPreferredSize(new Dimension(screenWidth, screenHeight));
+        this.setBackground(Color.black);
+        this.setDoubleBuffered(true);
+        this.addKeyListener(keyH);
+        this.setFocusable(true);
+
+        gameState = loadingState;
+
+        loadImages();
+        initMenuButtons();
+
+        // Character select screen
+        charSelect = new SelectCharacter(this);
+
+        // Menu buttons mouse listener
+        this.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (gameState == titleState) handleMenuClick(e.getPoint());
+            }
+        });
+
+        // Simulate loading screen delay
+        new Thread(() -> {
+            try { Thread.sleep(2000); } catch (InterruptedException e) {}
+            gameState = titleState;
+        }).start();
+    }
+
+    private void loadImages() {
+        try {
+            mapImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/gle.png")));
+        } catch (Exception e) {
+            System.out.println("Map image failed to load, using placeholder.");
+        }
+    }
+
+    private void initMenuButtons() {
+        int btnW = 300, btnH = 60;
+        int centerX = screenWidth / 2 - btnW / 2;
+
+        startBtn = new Rectangle(centerX, 250, btnW, btnH);
+        selectCharBtn = new Rectangle(centerX, 350, btnW, btnH);
+        libraryBtn = new Rectangle(centerX, 450, btnW, btnH);
+        exitBtn = new Rectangle(centerX, 550, btnW, btnH);
+    }
+
+    private void handleMenuClick(Point p) {
+        if (startBtn.contains(p)) {
+            player = new Player(this, keyH, "ivan"); // default
+            gameState = playState;
+        } else if (selectCharBtn.contains(p)) {
+            gameState = charSelectState;
+        } else if (libraryBtn.contains(p)) {
+            gameState = libraryState;
+        } else if (exitBtn.contains(p)) {
+            System.exit(0);
+        }
+    }
+
+    public void startGameThread() {
+        gameThread = new Thread(this);
+        gameThread.start();
+    }
+
+    @Override
+    public void run() {
+        double drawInterval = 1000000000.0 / fps;
+        double delta = 0;
+        long lastTime = System.nanoTime();
+
+        while (gameThread != null) {
+            long currentTime = System.nanoTime();
+            delta += (currentTime - lastTime) / drawInterval;
+            lastTime = currentTime;
+            if (delta >= 1) {
+                update();
+                repaint();
+                delta--;
+            }
+        }
+    }
+
+    public void update() {
+        if (gameState == playState && player != null) {
+            player.update();
+            if (keyH.escPressed) gameState = titleState;
+        }
+        if (gameState == charSelectState) {
+            if (keyH.escPressed) gameState = titleState;
+        }
+        if (gameState == libraryState) {
+            if (keyH.escPressed) gameState = titleState;
+        }
+    }
+
+    @Override
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+
+        switch (gameState) {
+            case loadingState -> drawLoading(g2);
+            case titleState -> drawMenu(g2);
+            case charSelectState -> charSelect.draw(g2);
+            case playState -> drawGame(g2);
+            case libraryState -> drawLibrary(g2);
         }
 
-        repaint();
-    }   
-  }
+        g2.dispose();
+    }
 
-  public void update(){
-        player.update();
-  }
+    private void drawLoading(Graphics2D g2) {
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0,0,getWidth(),getHeight());
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.BOLD, 50));
+        g2.drawString("LOADING...", getWidth()/2 - 150, getHeight()/2);
+    }
 
-  @Override
-  public void paintComponent(Graphics g){
-    super.paintComponent(g);
-    Graphics2D g2 = (Graphics2D)g;
-    
-    player.draw(g2);
+    private void drawMenu(Graphics2D g2) {
+        g2.setColor(new Color(50,50,80));
+        g2.fillRect(0,0,getWidth(),getHeight());
 
-    g2.dispose();
-  }
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.BOLD, 50));
+        g2.drawString("MAIN MENU", getWidth()/2 - 150, 150);
+
+        drawBtn(g2, "START GAME", startBtn);
+        drawBtn(g2, "SELECT CHARACTER", selectCharBtn);
+        drawBtn(g2, "LIBRARY", libraryBtn);
+        drawBtn(g2, "EXIT", exitBtn);
+    }
+
+    private void drawGame(Graphics2D g2) {
+        if (mapImage != null) g2.drawImage(mapImage, 0, 0, getWidth(), getHeight(), null);
+        else {
+            g2.setColor(Color.DARK_GRAY);
+            g2.fillRect(0,0,getWidth(),getHeight());
+        }
+
+        if (player != null) player.draw(g2);
+
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.PLAIN, 20));
+        g2.drawString("ESC to Menu", 20,30);
+    }
+
+    private void drawLibrary(Graphics2D g2) {
+        g2.setColor(new Color(30,30,30));
+        g2.fillRect(0,0,getWidth(),getHeight());
+
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.BOLD, 50));
+        g2.drawString("LIBRARY", getWidth()/2 - 120, 120);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 28));
+        g2.drawString("Items:", 200, 250);
+        g2.drawString("- Sword : +10 Attack", 200, 300);
+        g2.drawString("- Shield : +15 Defense", 200, 340);
+
+        g2.drawString("Skills:", 200, 420);
+        g2.drawString("- Fireball : 20 Mana", 200, 470);
+        g2.drawString("- Heal : Restore HP", 200, 510);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 20));
+        g2.drawString("Press ESC to return to menu", 20, 40);
+    }
+
+    private void drawBtn(Graphics2D g2, String text, Rectangle r) {
+        g2.setColor(Color.WHITE);
+        g2.draw(r);
+        g2.setFont(new Font("Arial", Font.BOLD, 30));
+        FontMetrics fm = g2.getFontMetrics();
+        int textX = r.x + (r.width - fm.stringWidth(text))/2;
+        int textY = r.y + (r.height - fm.getHeight())/2 + fm.getAscent();
+        g2.drawString(text, textX, textY);
+    }
 }
