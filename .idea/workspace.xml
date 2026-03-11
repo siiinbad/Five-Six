@@ -6,29 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Five-Six.iml" beforeDir="false" afterPath="$PROJECT_DIR$/Five-Six.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/production/Five-Six/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/production/Five-Six/.idea/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/production/Five-Six/.idea/modules.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/production/Five-Six/Five-Six.iml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/production/Five-Six/FiveSixGamePanel.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/production/Five-Six/Main.class" beforeDir="false" afterPath="$PROJECT_DIR$/out/production/Five-Six/Main.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/entity/Entity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/entity/Entity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/entity/Player.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/entity/Player.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/GamePanel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/GamePanel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/KeyHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/KeyHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/Main.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/Layer 1_sprite_movemenst2.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/Layer 1_sprite_movemenst5.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/Layer 1_sprite_movemenst8.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/down1.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/down2.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/left1.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/left2.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/right1.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/right2.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/up1.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/up2.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/res/sprites/ivan/ivan_front_stand.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/ivan/ivan_front_stand.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_stand.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_stand.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_walk2.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_walk2.png" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,8 +34,8 @@
 }</component>
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/siiinbad/Five-Six.git&quot;,
-    &quot;accountId&quot;: &quot;c6b8a168-338f-402c-b54e-e9fcaacc284e&quot;
+    &quot;url&quot;: &quot;https://github.com/siiinbad/Five-Six&quot;,
+    &quot;accountId&quot;: &quot;2afa242e-bd22-489b-ae22-3834c9f8febe&quot;
   }
 }</component>
   <component name="ProjectColorInfo">{
@@ -65,20 +46,24 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Application.Main.executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;onboarding.tips.debug.path&quot;: &quot;C:/Users/Ivan/IdeaProjects/Five-Six/src/Main.java&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.Main.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "main",
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "onboarding.tips.debug.path": "C:/Users/Ivan/IdeaProjects/Five-Six/src/Main.java",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "to.speed.mode.migration.done": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CreateClassDialog.RecentsKey">
       <recent name="entity" />
@@ -112,7 +97,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.31033.145" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26199.169" />
       </set>
     </attachedChunks>
   </component>

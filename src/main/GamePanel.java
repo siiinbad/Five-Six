@@ -30,7 +30,7 @@ public class GamePanel extends JPanel implements Runnable {
   public final int titleState = 0;
   public final int playState = 1;
 
-  Rectangle ivanBtn, nimuelBtn, samBtn;
+  Rectangle ivanBtn, nimuelBtn, samBtn, johnBtn;
 
   public GamePanel() {
     this.setPreferredSize(new Dimension(screenWidth, screenHeight));
@@ -50,6 +50,7 @@ public class GamePanel extends JPanel implements Runnable {
           if (ivanBtn.contains(e.getPoint())) selectChar("ivan");
           else if (nimuelBtn.contains(e.getPoint())) selectChar("nimuel");
           else if (samBtn.contains(e.getPoint())) selectChar("sam");
+          else if (johnBtn.contains(e.getPoint())) selectChar("john");
         }
       }
     });
@@ -63,6 +64,7 @@ public class GamePanel extends JPanel implements Runnable {
     ivanBtn = new Rectangle(centerX, 300, btnW, btnH);
     nimuelBtn = new Rectangle(centerX, 400, btnW, btnH);
     samBtn = new Rectangle(centerX, 500, btnW, btnH);
+    johnBtn = new Rectangle(centerX, 600, btnW, btnH);
   }
 
   private void loadImages() {
@@ -149,6 +151,7 @@ public class GamePanel extends JPanel implements Runnable {
     drawBtn(g2, "IVAN", ivanBtn);
     drawBtn(g2, "NIMUEL", nimuelBtn);
     drawBtn(g2, "SAM", samBtn);
+    drawBtn(g2,  "JOHN", johnBtn);
   }
 
   private void drawBtn(Graphics2D g2, String text, Rectangle r) {
