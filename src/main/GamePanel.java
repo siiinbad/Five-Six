@@ -8,6 +8,7 @@ import java.awt.image.BufferedImage;
 import java.util.Objects;
 import javax.imageio.ImageIO;
 import javax.swing.JPanel;
+import panels.MenuPage;
 import panels.SelectCharacter;
 
 public class GamePanel extends JPanel implements Runnable {
@@ -19,7 +20,7 @@ public class GamePanel extends JPanel implements Runnable {
     final int maxScreenCol = 16;
     final int maxScreenRow = 12;
     public int screenWidth = tileSize * maxScreenCol;
-    int screenHeight = tileSize * maxScreenRow;
+    public int screenHeight = tileSize * maxScreenRow;
 
     int fps = 60;
     public KeyHandler keyH = new KeyHandler(this);
@@ -36,36 +37,50 @@ public class GamePanel extends JPanel implements Runnable {
     public final int playState = 3;
     public final int libraryState = 4;
 
-    // Menu buttons
-    Rectangle startBtn, selectCharBtn, libraryBtn, exitBtn;
-
-    // Character select screen
-    SelectCharacter charSelect;
+    // Menu and character select
+    public MenuPage menuPage;
+    public SelectCharacter charSelect;
 
     public GamePanel() {
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
-        this.setBackground(Color.black);
+        this.setBackground(Color.BLACK);
         this.setDoubleBuffered(true);
         this.addKeyListener(keyH);
         this.setFocusable(true);
 
         gameState = loadingState;
 
+        // Load images
         loadImages();
-        initMenuButtons();
 
-        // Character select screen
+        // Initialize menu and character select
+        menuPage = new MenuPage(this);
         charSelect = new SelectCharacter(this);
 
-        // Menu buttons mouse listener
+        // Mouse handling
         this.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (gameState == titleState) handleMenuClick(e.getPoint());
+                Point p = e.getPoint();
+                if (p != null) {
+                    if (gameState == titleState) menuPage.handleClick(p);
+                    else if (gameState == charSelectState) charSelect.handleClick(p);
+                }
             }
         });
 
-        // Simulate loading screen delay
+        this.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                Point p = e.getPoint();
+                if (p != null) {
+                    if (gameState == titleState) menuPage.handleHover(p);
+                    else if (gameState == charSelectState) charSelect.handleHover(p);
+                }
+            }
+        });
+
+        // Simulate loading screen
         new Thread(() -> {
             try { Thread.sleep(2000); } catch (InterruptedException e) {}
             gameState = titleState;
@@ -77,29 +92,6 @@ public class GamePanel extends JPanel implements Runnable {
             mapImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/gle.png")));
         } catch (Exception e) {
             System.out.println("Map image failed to load, using placeholder.");
-        }
-    }
-
-    private void initMenuButtons() {
-        int btnW = 300, btnH = 60;
-        int centerX = screenWidth / 2 - btnW / 2;
-
-        startBtn = new Rectangle(centerX, 250, btnW, btnH);
-        selectCharBtn = new Rectangle(centerX, 350, btnW, btnH);
-        libraryBtn = new Rectangle(centerX, 450, btnW, btnH);
-        exitBtn = new Rectangle(centerX, 550, btnW, btnH);
-    }
-
-    private void handleMenuClick(Point p) {
-        if (startBtn.contains(p)) {
-            player = new Player(this, keyH, "ivan"); // default
-            gameState = playState;
-        } else if (selectCharBtn.contains(p)) {
-            gameState = charSelectState;
-        } else if (libraryBtn.contains(p)) {
-            gameState = libraryState;
-        } else if (exitBtn.contains(p)) {
-            System.exit(0);
         }
     }
 
@@ -131,11 +123,8 @@ public class GamePanel extends JPanel implements Runnable {
             player.update();
             if (keyH.escPressed) gameState = titleState;
         }
-        if (gameState == charSelectState) {
-            if (keyH.escPressed) gameState = titleState;
-        }
-        if (gameState == libraryState) {
-            if (keyH.escPressed) gameState = titleState;
+        if ((gameState == charSelectState || gameState == libraryState) && keyH.escPressed) {
+            gameState = titleState;
         }
     }
 
@@ -146,7 +135,7 @@ public class GamePanel extends JPanel implements Runnable {
 
         switch (gameState) {
             case loadingState -> drawLoading(g2);
-            case titleState -> drawMenu(g2);
+            case titleState -> menuPage.draw(g2);
             case charSelectState -> charSelect.draw(g2);
             case playState -> drawGame(g2);
             case libraryState -> drawLibrary(g2);
@@ -161,20 +150,6 @@ public class GamePanel extends JPanel implements Runnable {
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 50));
         g2.drawString("LOADING...", getWidth()/2 - 150, getHeight()/2);
-    }
-
-    private void drawMenu(Graphics2D g2) {
-        g2.setColor(new Color(50,50,80));
-        g2.fillRect(0,0,getWidth(),getHeight());
-
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("Arial", Font.BOLD, 50));
-        g2.drawString("MAIN MENU", getWidth()/2 - 150, 150);
-
-        drawBtn(g2, "START GAME", startBtn);
-        drawBtn(g2, "SELECT CHARACTER", selectCharBtn);
-        drawBtn(g2, "LIBRARY", libraryBtn);
-        drawBtn(g2, "EXIT", exitBtn);
     }
 
     private void drawGame(Graphics2D g2) {
@@ -192,33 +167,21 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawLibrary(Graphics2D g2) {
-        g2.setColor(new Color(30,30,30));
+        g2.setColor(new Color(30,30,50));
         g2.fillRect(0,0,getWidth(),getHeight());
-
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 50));
-        g2.drawString("LIBRARY", getWidth()/2 - 120, 120);
-
-        g2.setFont(new Font("Arial", Font.PLAIN, 28));
-        g2.drawString("Items:", 200, 250);
-        g2.drawString("- Sword : +10 Attack", 200, 300);
-        g2.drawString("- Shield : +15 Defense", 200, 340);
-
-        g2.drawString("Skills:", 200, 420);
-        g2.drawString("- Fireball : 20 Mana", 200, 470);
-        g2.drawString("- Heal : Restore HP", 200, 510);
-
+        g2.drawString("LIBRARY PLACEHOLDER", getWidth()/2 - 250, getHeight()/2);
         g2.setFont(new Font("Arial", Font.PLAIN, 20));
-        g2.drawString("Press ESC to return to menu", 20, 40);
+        g2.drawString("Press ESC to return", getWidth()/2 - 100, getHeight()/2 + 50);
     }
 
-    private void drawBtn(Graphics2D g2, String text, Rectangle r) {
-        g2.setColor(Color.WHITE);
-        g2.draw(r);
-        g2.setFont(new Font("Arial", Font.BOLD, 30));
-        FontMetrics fm = g2.getFontMetrics();
-        int textX = r.x + (r.width - fm.stringWidth(text))/2;
-        int textY = r.y + (r.height - fm.getHeight())/2 + fm.getAscent();
-        g2.drawString(text, textX, textY);
+    public void selectChar(String name) {
+        player = new Player(this, keyH, name);
+        gameState = playState;
+    }
+
+    public void openLibrary() {
+        gameState = libraryState;
     }
 }

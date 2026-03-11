@@ -1,9 +1,6 @@
 package panels;
 
-import entity.Player;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import main.GamePanel;
@@ -13,28 +10,15 @@ public class SelectCharacter {
     GamePanel gp;
 
     Rectangle ivanBtn, nimuelBtn, samBtn;
+    public String selectedChar = ""; // store selection
     String hoveredChar = "";
+
     BufferedImage ivanImg, nimuelImg, samImg;
 
     public SelectCharacter(GamePanel gp) {
         this.gp = gp;
         initButtons();
         loadImages();
-
-        gp.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                if (gp.gameState == gp.charSelectState) handleClick(e.getPoint());
-            }
-        });
-
-        gp.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
-            @Override
-            public void mouseMoved(MouseEvent e) {
-                if (gp.gameState == gp.charSelectState) handleHover(e.getPoint());
-                else hoveredChar = "";
-            }
-        });
     }
 
     private void initButtons() {
@@ -55,22 +39,22 @@ public class SelectCharacter {
         }
     }
 
-    private void handleClick(Point p) {
-        if (ivanBtn.contains(p)) selectChar("ivan");
-        else if (nimuelBtn.contains(p)) selectChar("nimuel");
-        else if (samBtn.contains(p)) selectChar("sam");
+    public void handleClick(Point p) {
+        if (p == null) return;
+        if (ivanBtn.contains(p)) selectedChar = "ivan";
+        else if (nimuelBtn.contains(p)) selectedChar = "nimuel";
+        else if (samBtn.contains(p)) selectedChar = "sam";
     }
 
-    private void handleHover(Point p) {
+    public void handleHover(Point p) {
+        if (p == null) {
+            hoveredChar = "";
+            return;
+        }
         if (ivanBtn.contains(p)) hoveredChar = "Ivan: Attack +10, HP +100";
         else if (nimuelBtn.contains(p)) hoveredChar = "Nimuel: Magic +15, MP +120";
         else if (samBtn.contains(p)) hoveredChar = "Sam: Defense +20, HP +150";
         else hoveredChar = "";
-    }
-
-    private void selectChar(String name) {
-        gp.player = new Player(gp, gp.keyH, name);
-        gp.gameState = gp.playState;
     }
 
     public void draw(Graphics2D g2) {
@@ -85,17 +69,26 @@ public class SelectCharacter {
         drawBtn(g2, "NIMUEL", nimuelBtn);
         drawBtn(g2, "SAM", samBtn);
 
-        // Draw hover text
+        // Hover text
         if (!hoveredChar.isEmpty()) {
             g2.setFont(new Font("Arial", Font.PLAIN, 28));
             g2.setColor(Color.YELLOW);
             g2.drawString(hoveredChar, gp.getWidth()/2 - 150, 550);
         }
 
-        // Draw hover image
-        if (ivanBtn.contains(gp.getMousePosition())) drawHoverImage(g2, ivanImg);
-        else if (nimuelBtn.contains(gp.getMousePosition())) drawHoverImage(g2, nimuelImg);
-        else if (samBtn.contains(gp.getMousePosition())) drawHoverImage(g2, samImg);
+        // Hover images safely
+        Point mouse = gp.getMousePosition();
+        if (mouse != null) {
+            if (ivanBtn.contains(mouse)) drawHoverImage(g2, ivanImg);
+            else if (nimuelBtn.contains(mouse)) drawHoverImage(g2, nimuelImg);
+            else if (samBtn.contains(mouse)) drawHoverImage(g2, samImg);
+        }
+
+        // Selected highlight
+        g2.setColor(Color.GREEN);
+        if (selectedChar.equals("ivan")) g2.draw(ivanBtn);
+        else if (selectedChar.equals("nimuel")) g2.draw(nimuelBtn);
+        else if (selectedChar.equals("sam")) g2.draw(samBtn);
     }
 
     private void drawHoverImage(Graphics2D g2, BufferedImage img) {

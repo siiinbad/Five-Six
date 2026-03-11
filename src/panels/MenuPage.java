@@ -1,15 +1,14 @@
 package panels;
 
 import java.awt.*;
-import java.awt.event.*;
-import javax.swing.*;
 import main.GamePanel;
 
 public class MenuPage {
+
     GamePanel gp;
 
-    // Buttons
-    public Rectangle startBtn, ivanBtn, nimuelBtn, samBtn, libraryBtn, exitBtn;
+    public Rectangle startBtn, selectCharBtn, libraryBtn, exitBtn;
+    String hoveredText = "";
 
     public MenuPage(GamePanel gp) {
         this.gp = gp;
@@ -17,16 +16,35 @@ public class MenuPage {
     }
 
     private void initButtons() {
-        int btnW = 300;
-        int btnH = 60;
+        int btnW = 300, btnH = 60;
         int centerX = gp.screenWidth / 2 - btnW / 2;
-
         startBtn = new Rectangle(centerX, 250, btnW, btnH);
-        ivanBtn = new Rectangle(centerX, 350, btnW, btnH);
-        nimuelBtn = new Rectangle(centerX, 450, btnW, btnH);
-        samBtn = new Rectangle(centerX, 550, btnW, btnH);
-        libraryBtn = new Rectangle(centerX, 650, btnW, btnH);
-        exitBtn = new Rectangle(centerX, 750, btnW, btnH);
+        selectCharBtn = new Rectangle(centerX, 350, btnW, btnH);
+        libraryBtn = new Rectangle(centerX, 450, btnW, btnH);
+        exitBtn = new Rectangle(centerX, 550, btnW, btnH);
+    }
+
+    public void handleClick(Point p) {
+        if (startBtn.contains(p)) {
+            // Start game with selected character
+            String charToUse = gp.charSelect.selectedChar;
+            if (charToUse.isEmpty()) charToUse = "ivan"; // default
+            gp.selectChar(charToUse);
+        } else if (selectCharBtn.contains(p)) {
+            gp.gameState = gp.charSelectState;
+        } else if (libraryBtn.contains(p)) {
+            gp.openLibrary();
+        } else if (exitBtn.contains(p)) {
+            System.exit(0);
+        }
+    }
+
+    public void handleHover(Point p) {
+        if (startBtn.contains(p)) hoveredText = "Start the adventure!";
+        else if (selectCharBtn.contains(p)) hoveredText = "Choose your hero";
+        else if (libraryBtn.contains(p)) hoveredText = "View items and skills";
+        else if (exitBtn.contains(p)) hoveredText = "Exit the game";
+        else hoveredText = "";
     }
 
     public void draw(Graphics2D g2) {
@@ -38,11 +56,15 @@ public class MenuPage {
         g2.drawString("MAIN MENU", gp.getWidth() / 2 - 150, 150);
 
         drawBtn(g2, "START GAME", startBtn);
-        drawBtn(g2, "IVAN", ivanBtn);
-        drawBtn(g2, "NIMUEL", nimuelBtn);
-        drawBtn(g2, "SAM", samBtn);
+        drawBtn(g2, "SELECT CHARACTER", selectCharBtn);
         drawBtn(g2, "LIBRARY", libraryBtn);
         drawBtn(g2, "EXIT", exitBtn);
+
+        if (!hoveredText.isEmpty()) {
+            g2.setFont(new Font("Arial", Font.PLAIN, 25));
+            g2.setColor(Color.YELLOW);
+            g2.drawString(hoveredText, gp.getWidth()/2 - 100, 650);
+        }
     }
 
     private void drawBtn(Graphics2D g2, String text, Rectangle r) {
@@ -50,25 +72,8 @@ public class MenuPage {
         g2.draw(r);
         g2.setFont(new Font("Arial", Font.BOLD, 30));
         FontMetrics fm = g2.getFontMetrics();
-        int textX = r.x + (r.width - fm.stringWidth(text)) / 2;
-        int textY = r.y + (r.height - fm.getHeight()) / 2 + fm.getAscent();
+        int textX = r.x + (r.width - fm.stringWidth(text))/2;
+        int textY = r.y + (r.height - fm.getHeight())/2 + fm.getAscent();
         g2.drawString(text, textX, textY);
-    }
-
-    public void handleClick(Point p) {
-        if (startBtn.contains(p)) {
-            gp.gameState = gp.playState;
-            gp.player = new gp.playerClass(gp, gp.keyH, "ivan"); // default
-        } else if (ivanBtn.contains(p)) {
-            gp.selectChar("ivan");
-        } else if (nimuelBtn.contains(p)) {
-            gp.selectChar("nimuel");
-        } else if (samBtn.contains(p)) {
-            gp.selectChar("sam");
-        } else if (libraryBtn.contains(p)) {
-            new gp.LibraryUI(); // open library window
-        } else if (exitBtn.contains(p)) {
-            System.exit(0);
-        }
     }
 }
