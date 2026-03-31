@@ -1,19 +1,20 @@
 package panels;
 
 import java.awt.*;
-import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
+import javax.imageio.*;
+import javax.swing.ImageIcon;
+
 import main.GamePanel;
 
 public class SelectCharacter {
 
     GamePanel gp;
 
-    Rectangle ivanBtn, nimuelBtn, samBtn;
+    Rectangle ivanBtn, nimuelBtn, samBtn, backBtn, selectBtn;
     public String selectedChar = ""; // store selection
     String hoveredChar = "";
 
-    BufferedImage ivanImg, nimuelImg, samImg;
+    ImageIcon ivanImg, nimuelImg, samImg;
 
     public SelectCharacter(GamePanel gp) {
         this.gp = gp;
@@ -23,17 +24,19 @@ public class SelectCharacter {
 
     private void initButtons() {
         int btnW = 250, btnH = 60;
-        int centerX = gp.screenWidth / 2 - btnW / 2;
-        ivanBtn = new Rectangle(centerX, 250, btnW, btnH);
-        nimuelBtn = new Rectangle(centerX, 350, btnW, btnH);
-        samBtn = new Rectangle(centerX, 450, btnW, btnH);
+        int centerX = gp.screenWidth / 4 + 50;
+        ivanBtn = new Rectangle(20, 250, btnW, btnH);
+        nimuelBtn = new Rectangle(20, 350, btnW, btnH);
+        samBtn = new Rectangle(20, 450, btnW, btnH);
+        backBtn = new Rectangle(20, 550, btnW, btnH);
+        selectBtn = new Rectangle(centerX, 650, btnW, btnH);
     }
 
     private void loadImages() {
         try {
-            ivanImg = ImageIO.read(getClass().getResourceAsStream("/res/sprites/ivan/ivan_front_stand.png"));
-            nimuelImg = ImageIO.read(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_front_stand.png"));
-            samImg = ImageIO.read(getClass().getResourceAsStream("/res/sprites/sam/sam_front_stand.png"));
+            ivanImg = new ImageIcon(getClass().getResource("/res/sprites/ivan/ivan_initial_select.gif"));
+            nimuelImg = new ImageIcon(getClass().getResource("/res/sprites/nimuel/nimuel_initial_select.gif"));
+            samImg = new ImageIcon(getClass().getResource("/res/sprites/sam/sam_initial_select.gif"));
         } catch (Exception e) {
             System.out.println("Failed to load character images.");
         }
@@ -68,6 +71,8 @@ public class SelectCharacter {
         drawBtn(g2, "IVAN", ivanBtn);
         drawBtn(g2, "NIMUEL", nimuelBtn);
         drawBtn(g2, "SAM", samBtn);
+        drawBtn(g2, "BACK", backBtn);
+        drawBtn(g2, "SELECT", selectBtn);
 
         // Hover text
         if (!hoveredChar.isEmpty()) {
@@ -79,9 +84,9 @@ public class SelectCharacter {
         // Hover images safely
         Point mouse = gp.getMousePosition();
         if (mouse != null) {
-            if (ivanBtn.contains(mouse)) drawHoverImage(g2, ivanImg);
-            else if (nimuelBtn.contains(mouse)) drawHoverImage(g2, nimuelImg);
-            else if (samBtn.contains(mouse)) drawHoverImage(g2, samImg);
+            if (ivanBtn.contains(mouse)) drawHoverImage(g2, ivanImg.getImage());
+            else if (nimuelBtn.contains(mouse)) drawHoverImage(g2, nimuelImg.getImage());
+            else if (samBtn.contains(mouse)) drawHoverImage(g2, samImg.getImage());
         }
 
         // Selected highlight
@@ -91,10 +96,9 @@ public class SelectCharacter {
         else if (selectedChar.equals("sam")) g2.draw(samBtn);
     }
 
-    private void drawHoverImage(Graphics2D g2, BufferedImage img) {
+    private void drawHoverImage(Graphics2D g2, Image img) {
         if (img != null) {
-            int w = 150, h = 150;
-            g2.drawImage(img, gp.getWidth()/2 - w/2, 380, w, h, null);
+            g2.drawImage(img, gp.getWidth()/2 - 150, 200, 450, 450, null);
         }
     }
 

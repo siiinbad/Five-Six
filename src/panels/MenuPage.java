@@ -7,7 +7,7 @@ public class MenuPage {
 
     GamePanel gp;
 
-    public Rectangle startBtn, selectCharBtn, libraryBtn, exitBtn;
+    public Rectangle startBtn, libraryBtn, exitBtn;
     String hoveredText = "";
 
     public MenuPage(GamePanel gp) {
@@ -19,18 +19,12 @@ public class MenuPage {
         int btnW = 300, btnH = 60;
         int centerX = gp.screenWidth / 2 - btnW / 2;
         startBtn = new Rectangle(centerX, 250, btnW, btnH);
-        selectCharBtn = new Rectangle(centerX, 350, btnW, btnH);
         libraryBtn = new Rectangle(centerX, 450, btnW, btnH);
         exitBtn = new Rectangle(centerX, 550, btnW, btnH);
     }
 
     public void handleClick(Point p) {
         if (startBtn.contains(p)) {
-            // Start game with selected character
-            String charToUse = gp.charSelect.selectedChar;
-            if (charToUse.isEmpty()) charToUse = "ivan"; // default
-            gp.selectChar(charToUse);
-        } else if (selectCharBtn.contains(p)) {
             gp.gameState = gp.charSelectState;
         } else if (libraryBtn.contains(p)) {
             gp.openLibrary();
@@ -41,7 +35,6 @@ public class MenuPage {
 
     public void handleHover(Point p) {
         if (startBtn.contains(p)) hoveredText = "Start the adventure!";
-        else if (selectCharBtn.contains(p)) hoveredText = "Choose your hero";
         else if (libraryBtn.contains(p)) hoveredText = "View items and skills";
         else if (exitBtn.contains(p)) hoveredText = "Exit the game";
         else hoveredText = "";
@@ -52,11 +45,10 @@ public class MenuPage {
         g2.fillRect(0, 0, gp.getWidth(), gp.getHeight());
 
         g2.setColor(Color.WHITE);
-        g2.setFont(new Font("Arial", Font.BOLD, 50));
-        g2.drawString("MAIN MENU", gp.getWidth() / 2 - 150, 150);
+        g2.setFont(new Font("Ubuntu", Font.BOLD, 50));
+        g2.drawString("FIVE SIX", gp.getWidth() / 2 - 150, 150);
 
         drawBtn(g2, "START GAME", startBtn);
-        drawBtn(g2, "SELECT CHARACTER", selectCharBtn);
         drawBtn(g2, "LIBRARY", libraryBtn);
         drawBtn(g2, "EXIT", exitBtn);
 
