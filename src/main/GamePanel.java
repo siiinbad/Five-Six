@@ -1,15 +1,17 @@
 package main;
 
+import entity.Enemy;
 import entity.Player;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import java.util.Objects;
+import java.util.*;
+import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.JPanel;
-import panels.MenuPage;
-import panels.SelectCharacter;
+import panels.*;
+import collision.*;
 
 public class GamePanel extends JPanel implements Runnable {
 
@@ -27,7 +29,13 @@ public class GamePanel extends JPanel implements Runnable {
     Thread gameThread;
     public Player player;
 
-    BufferedImage mapImage;
+    // MAP SYSTEM
+    public int currentMap = 1;
+    public final int MAP_1 = 1;
+    public final int MAP_2 = 2;
+
+    BufferedImage map1Image;
+    BufferedImage map2Image;
 
     // Game states
     public int gameState;
@@ -41,6 +49,15 @@ public class GamePanel extends JPanel implements Runnable {
     public MenuPage menuPage;
     public SelectCharacter charSelect;
 
+    // MAP DATA
+    public List<Enemy> map1Enemies = new ArrayList<>();
+    public List<Enemy> map2Enemies = new ArrayList<>();
+
+    public List<Rectangle> map1Walls = new ArrayList<>();
+    public List<Rectangle> map2Walls = new ArrayList<>();
+
+    public CollisionChecker cChecker = new CollisionChecker(this);
+
     public GamePanel() {
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
         this.setBackground(Color.BLACK);
@@ -50,10 +67,9 @@ public class GamePanel extends JPanel implements Runnable {
 
         gameState = loadingState;
 
-        // Load images
         loadImages();
+        setupMaps();
 
-        // Initialize menu and character select
         menuPage = new MenuPage(this);
         charSelect = new SelectCharacter(this);
 
@@ -80,7 +96,7 @@ public class GamePanel extends JPanel implements Runnable {
             }
         });
 
-        // Simulate loading screen
+        // Fake loading
         new Thread(() -> {
             try { Thread.sleep(2000); } catch (InterruptedException e) {}
             gameState = titleState;
@@ -89,9 +105,48 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void loadImages() {
         try {
-            mapImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/gle.png")));
+            map1Image = ImageIO.read(Objects.requireNonNull(
+                    getClass().getResourceAsStream("/res/sprites/map/gle.png")));
+
+            map2Image = ImageIO.read(Objects.requireNonNull(
+                    getClass().getResourceAsStream("/res/sprites/map/map2.png")));
+
         } catch (Exception e) {
-            System.out.println("Map image failed to load, using placeholder.");
+            System.out.println("Map image failed to load.");
+        }
+    }
+
+    private void setupMaps() {
+
+        // -------- MAP 1 --------
+        map1Walls.add(new Rectangle(328, 410, 539, 90));  // x, y, width, height
+        map1Walls.add(new Rectangle(1050, 410, 539, 90));
+        map1Walls.add(new Rectangle(190, 612, 670, 90));
+        map1Walls.add(new Rectangle(1050, 612, 680, 90));
+        map1Walls.add(new Rectangle(175, 834, 690, 90));
+        map1Walls.add(new Rectangle(1050, 834, 690, 90));
+
+        map1Enemies.add(new Enemy(this, 300, 250, "alieyandrew"));
+        map1Enemies.add(new Enemy(this, 700, 450, "dirk"));
+        map1Enemies.add(new Enemy(this, 700, 450, "james"));
+
+        // -------- MAP 2 --------
+        map2Walls.add(new Rectangle(200, 300, 400, 40));
+        map2Walls.add(new Rectangle(800, 500, 400, 40));
+
+        map2Enemies.add(new Enemy(this, 400, 250, "kyle"));
+        map2Enemies.add(new Enemy(this, 900, 450, "vaughn"));
+    }
+
+    public void switchMap(int map) {
+        currentMap = map;
+
+        if (map == MAP_1) {
+            player.worldX = 100;
+            player.worldY = 100;
+        } else if (map == MAP_2) {
+            player.worldX = 200;
+            player.worldY = 200;
         }
     }
 
@@ -110,6 +165,7 @@ public class GamePanel extends JPanel implements Runnable {
             long currentTime = System.nanoTime();
             delta += (currentTime - lastTime) / drawInterval;
             lastTime = currentTime;
+
             if (delta >= 1) {
                 update();
                 repaint();
@@ -120,10 +176,30 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void update() {
         if (gameState == playState && player != null) {
+
             player.update();
+
+            List<Enemy> currentEnemies =
+                    (currentMap == MAP_1) ? map1Enemies : map2Enemies;
+
+            for (Enemy e : currentEnemies) {
+                e.update();
+            }
+
+            // SIMPLE MAP SWITCH (right edge)
+            if (player.worldX > screenWidth - 50) {
+                switchMap(MAP_2);
+            }
+
+            if (player.worldX < 10) {
+                switchMap(MAP_1);
+            }
+
             if (keyH.escPressed) gameState = titleState;
         }
-        if ((gameState == charSelectState || gameState == libraryState) && keyH.escPressed) {
+
+        if ((gameState == charSelectState || gameState == libraryState)
+                && keyH.escPressed) {
             gameState = titleState;
         }
     }
@@ -153,7 +229,12 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawGame(Graphics2D g2) {
-        if (mapImage != null) g2.drawImage(mapImage, 0, 0, getWidth(), getHeight(), null);
+
+        BufferedImage currentMapImage =
+                (currentMap == MAP_1) ? map1Image : map2Image;
+
+        if (currentMapImage != null)
+            g2.drawImage(currentMapImage, 0, 0, getWidth(), getHeight(), null);
         else {
             g2.setColor(Color.DARK_GRAY);
             g2.fillRect(0,0,getWidth(),getHeight());
@@ -161,9 +242,27 @@ public class GamePanel extends JPanel implements Runnable {
 
         if (player != null) player.draw(g2);
 
+        // DRAW ENEMIES
+        List<Enemy> currentEnemies =
+                (currentMap == MAP_1) ? map1Enemies : map2Enemies;
+
+        for (Enemy e : currentEnemies) {
+            e.draw(g2);
+        }
+
+        // DRAW WALLS
+        g2.setColor(Color.GRAY);
+        List<Rectangle> currentWalls =
+                (currentMap == MAP_1) ? map1Walls : map2Walls;
+
+        for (Rectangle wall : currentWalls) {
+            g2.fillRect(wall.x, wall.y, wall.width, wall.height);
+        }
+
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.PLAIN, 20));
-        g2.drawString("ESC to Menu", 20,30);
+        g2.drawString("MAP: " + currentMap, 20, 30);
+        g2.drawString("ESC to Menu", 20, 60);
     }
 
     private void drawLibrary(Graphics2D g2) {
@@ -171,14 +270,20 @@ public class GamePanel extends JPanel implements Runnable {
         g2.fillRect(0,0,getWidth(),getHeight());
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 50));
-        g2.drawString("LIBRARY PLACEHOLDER", getWidth()/2 - 250, getHeight()/2);
+        g2.drawString("LIBRARY PLACEHOLDER",
+                getWidth()/2 - 250, getHeight()/2);
         g2.setFont(new Font("Arial", Font.PLAIN, 20));
-        g2.drawString("Press ESC to return", getWidth()/2 - 100, getHeight()/2 + 50);
+        g2.drawString("Press ESC to return",
+                getWidth()/2 - 100, getHeight()/2 + 50);
     }
 
     public void selectChar(String name) {
         player = new Player(this, keyH, name);
         gameState = playState;
+    }
+
+    public void openTitle(){
+        gameState = titleState;
     }
 
     public void openLibrary() {

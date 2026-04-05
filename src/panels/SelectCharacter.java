@@ -1,7 +1,6 @@
 package panels;
 
 import java.awt.*;
-import javax.imageio.*;
 import javax.swing.ImageIcon;
 
 import main.GamePanel;
@@ -44,10 +43,17 @@ public class SelectCharacter {
 
     public void handleClick(Point p) {
         if (p == null) return;
-        if (ivanBtn.contains(p)) selectedChar = "ivan";
+        else if (ivanBtn.contains(p)) selectedChar = "ivan";
         else if (nimuelBtn.contains(p)) selectedChar = "nimuel";
         else if (samBtn.contains(p)) selectedChar = "sam";
+        else if(selectBtn.contains(p) && !selectedChar.isEmpty() && selectedChar != null){
+            gp.selectChar(selectedChar);
+        }
+        else if (backBtn.contains(p)) {
+            gp.openTitle();
+        }
     }
+        
 
     public void handleHover(Point p) {
         if (p == null) {
