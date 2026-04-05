@@ -33,7 +33,7 @@ public class Enemy extends Entity {
             String path = "/res/sprites/" + name + "/" + name + "_stand.png";
 
             image = ImageIO.read(Objects.requireNonNull(
-                getClass().getResourceAsStream(path)
+                    getClass().getResourceAsStream(path)
             ));
 
         } catch (IOException | NullPointerException e) {
@@ -54,13 +54,16 @@ public class Enemy extends Entity {
             g2.fillRect(worldX, worldY, gp.tileSize, gp.tileSize);
         }
 
-        // hitbox debug
+        // hitbox debug (transparent overlay)
+        Composite oldComposite = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0));
         g2.setColor(Color.YELLOW);
-        g2.drawRect(
-            worldX + solidArea.x,
-            worldY + solidArea.y,
-            solidArea.width,
-            solidArea.height
+        g2.fillRect(
+                worldX + solidArea.x,
+                worldY + solidArea.y,
+                solidArea.width,
+                solidArea.height
         );
+        g2.setComposite(oldComposite);
     }
 }

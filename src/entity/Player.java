@@ -154,12 +154,15 @@ public class Player extends Entity {
         g2.drawImage(image, worldX, worldY, gp.tileSize, gp.tileSize, null);
 
         // Debug hitbox
+        Composite oldComposite = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0));
         g2.setColor(Color.RED);
-        g2.drawRect(
+        g2.fillRect(
                 worldX + solidArea.x,
                 worldY + solidArea.y,
                 solidArea.width,
                 solidArea.height
         );
+        g2.setComposite(oldComposite);
     }
 }

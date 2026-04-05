@@ -119,16 +119,19 @@ public class GamePanel extends JPanel implements Runnable {
     private void setupMaps() {
 
         // -------- MAP 1 --------
-        map1Walls.add(new Rectangle(328, 410, 539, 90));  // x, y, width, height
-        map1Walls.add(new Rectangle(1050, 410, 539, 90));
-        map1Walls.add(new Rectangle(190, 612, 670, 90));
-        map1Walls.add(new Rectangle(1050, 612, 680, 90));
-        map1Walls.add(new Rectangle(175, 834, 690, 90));
-        map1Walls.add(new Rectangle(1050, 834, 690, 90));
+        map1Walls.add(new Rectangle(264, 333, 433, 58)); // x, y, width, height
+        map1Walls.add(new Rectangle(846, 333, 433, 58));
 
-        map1Enemies.add(new Enemy(this, 300, 250, "alieyandrew"));
-        map1Enemies.add(new Enemy(this, 700, 450, "dirk"));
-        map1Enemies.add(new Enemy(this, 700, 450, "james"));
+        map1Walls.add(new Rectangle(153, 495, 539, 58));
+        map1Walls.add(new Rectangle(846, 495, 539, 58));
+
+        map1Walls.add(new Rectangle(144, 675, 545, 58));
+        map1Walls.add(new Rectangle(846, 675, 545, 58));
+
+
+        map1Enemies.add(new Enemy(this, 300, 338, "alieyandrew"));
+        map1Enemies.add(new Enemy(this, 1160, 190, "dirk"));
+        map1Enemies.add(new Enemy(this, 700, 452, "james"));
 
         // -------- MAP 2 --------
         map2Walls.add(new Rectangle(200, 300, 400, 40));
@@ -251,13 +254,15 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         // DRAW WALLS
+        Composite oldComposite = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0)); //make wall transparent
         g2.setColor(Color.GRAY);
-        List<Rectangle> currentWalls =
-                (currentMap == MAP_1) ? map1Walls : map2Walls;
+        List<Rectangle> currentWalls = (currentMap == MAP_1) ? map1Walls : map2Walls;
 
         for (Rectangle wall : currentWalls) {
             g2.fillRect(wall.x, wall.y, wall.width, wall.height);
         }
+        g2.setComposite(oldComposite);
 
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.PLAIN, 20));
