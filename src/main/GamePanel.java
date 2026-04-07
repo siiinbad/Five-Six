@@ -105,11 +105,11 @@ public class GamePanel extends JPanel implements Runnable {
 
     // Title screen character buttons
     int btnW = 300, btnH = 60;
-    int centerX = screenWidth / 2 - btnW / 2;
-    ivanBtn     = new Rectangle(centerX, 300, btnW, btnH);
-    nimuelBtn   = new Rectangle(centerX, 400, btnW, btnH);
-    samBtn      = new Rectangle(centerX, 500, btnW, btnH);
-    johnfielBtn = new Rectangle(centerX, 600, btnW, btnH);
+    int leftX = 100;
+    ivanBtn     = new Rectangle(leftX, 300, btnW, btnH);
+    nimuelBtn   = new Rectangle(leftX, 400, btnW, btnH);
+    samBtn      = new Rectangle(leftX, 500, btnW, btnH);
+    johnfielBtn = new Rectangle(leftX, 600, btnW, btnH);
 
     loadImages();
 
@@ -500,7 +500,7 @@ public class GamePanel extends JPanel implements Runnable {
             int imgW = (int)(img.getWidth() * scale);
             int imgH = (int)(img.getHeight() * scale);
             int cardX = screenWidth / 2 - 160;
-            int imgX = cardX - imgW - 700; //Adjust character postion of X
+            int imgX = cardX - imgW - 250; //Adjust character postion of X
             int imgY = 320; //Adjust character postion of Y
             g2.drawImage(img, imgX, imgY, imgW, imgH, null);
           }
@@ -512,7 +512,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawStatCard(Graphics2D g2, CharacterStats.CharacterType ct) {
-      int cardX = screenWidth / 2 - 700; //adjust the character description X
+      int cardX = screenWidth / 2 - 200; //adjust the postion of character description X
       int cardY = 280;
       int cardW = 320;
       int cardH = 220;
