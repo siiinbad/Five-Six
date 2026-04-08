@@ -31,6 +31,9 @@ public class GamePanel extends JPanel implements Runnable {
   // NPC IMAGES
   public BufferedImage jamesStand, alieyandrewStand, kyleStand, johnruStand, adrianStand;
 
+  // PLAYER CHARACTER IMAGES
+  public BufferedImage[] ivanStands, nimuelStands, samStands, johnfielStands;
+
   // COLOR CONSTANTS
   public final int COLOR_WALL        = 0xA349A4;
   public final int COLOR_DOOR        = 0xFF7F27;
@@ -60,6 +63,8 @@ public class GamePanel extends JPanel implements Runnable {
   // TITLE SCREEN
   Rectangle ivanBtn, nimuelBtn, samBtn, johnfielBtn;
   private int hoveredCharIndex = -1;
+  private int hoverFrameCounter = 0;
+  private int lastHoveredIndex = -1;
   private static final CharacterStats.CharacterType[] CHAR_TYPES = {
           CharacterStats.CharacterType.IVAN,
           CharacterStats.CharacterType.NIMUEL,
@@ -100,11 +105,11 @@ public class GamePanel extends JPanel implements Runnable {
 
     // Title screen character buttons
     int btnW = 300, btnH = 60;
-    int centerX = screenWidth / 2 - btnW / 2;
-    ivanBtn     = new Rectangle(centerX, 300, btnW, btnH);
-    nimuelBtn   = new Rectangle(centerX, 400, btnW, btnH);
-    samBtn      = new Rectangle(centerX, 500, btnW, btnH);
-    johnfielBtn = new Rectangle(centerX, 600, btnW, btnH);
+    int leftX = 100;
+    ivanBtn     = new Rectangle(leftX, 300, btnW, btnH);
+    nimuelBtn   = new Rectangle(leftX, 400, btnW, btnH);
+    samBtn      = new Rectangle(leftX, 500, btnW, btnH);
+    johnfielBtn = new Rectangle(leftX, 600, btnW, btnH);
 
     loadImages();
 
@@ -174,8 +179,38 @@ public class GamePanel extends JPanel implements Runnable {
       kyleStand        = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/kyle/kyle_stand.png")));
       johnruStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnru/johnru_stand.png")));
       adrianStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/adrian/adrian_stand.png")));
+      ivanStands = new BufferedImage[4];
+      ivanStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_front_stand.png")));
+      ivanStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_left_stand.png")));
+      ivanStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_back_stand.png")));
+      ivanStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_right_stand.png")));
+      nimuelStands = new BufferedImage[4];
+      nimuelStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_front_stand.png")));
+      nimuelStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_left_stand.png")));
+      nimuelStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_back_stand.png")));
+      nimuelStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_right_stand.png")));
+      samStands = new BufferedImage[4];
+      samStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_front_stand.png")));
+      samStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_left_stand.png")));
+      samStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_back_stand.png")));
+      samStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_right_stand.png")));
+      johnfielStands = new BufferedImage[4];
+      johnfielStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_front_stand.png")));
+      johnfielStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_left_stand.png")));
+      johnfielStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_back_stand.png")));
+      johnfielStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_right_stand.png")));
     } catch (Exception e) {
       System.out.println("Image loading failed.");
+    }
+  }
+
+  private BufferedImage[] getHoveredImages(int index) {
+    switch (index) {
+      case 0: return ivanStands;
+      case 1: return nimuelStands;
+      case 2: return samStands;
+      case 3: return johnfielStands;
+      default: return null;
     }
   }
 
@@ -392,6 +427,23 @@ public class GamePanel extends JPanel implements Runnable {
       if (color == COLOR_ADRIAN)      img = adrianStand;
 
       if (img != null) {
+        //draw shadow ellipse beneath the enemy
+        g2.setColor(new Color(0, 0, 0, 100));
+        int shadowWidth = (int)(tileSize * 0.6);
+        int shadowHeight = (int)(tileSize * 0.15);
+        int shadowX = drawX + (tileSize - shadowWidth) / 2;
+        
+        //adjust shadow offset for different characters
+        int shadowOffset = 15;
+        if (color == COLOR_KYLE || color == COLOR_JOHNRU) {
+          shadowOffset = 25;
+        } else if (color == COLOR_JAMES) {
+          shadowOffset = 20;
+        }
+        
+        int shadowY = drawY + tileSize - shadowHeight - shadowOffset;
+        g2.fillOval(shadowX, shadowY, shadowWidth, shadowHeight);
+        
         g2.drawImage(img, drawX, drawY, tileSize, tileSize, null);
       }
     }
@@ -427,7 +479,7 @@ public class GamePanel extends JPanel implements Runnable {
 
       g2.setFont(new Font("Arial", Font.ITALIC, 22));
       g2.setColor(new Color(180, 180, 220));
-      String sub = "Hover over a character to see their stats";
+      String sub = "Hover your cursor to one of character to see the description of them";
       int sw = g2.getFontMetrics().stringWidth(sub);
       g2.drawString(sub, getWidth() / 2 - sw / 2, 250);
 
@@ -451,12 +503,33 @@ public class GamePanel extends JPanel implements Runnable {
       }
 
       if (hoveredCharIndex >= 0) {
+        if (hoveredCharIndex != lastHoveredIndex) {
+          hoverFrameCounter = 0;
+          lastHoveredIndex = hoveredCharIndex;
+        }
+        hoverFrameCounter++;
+        BufferedImage[] imgs = getHoveredImages(hoveredCharIndex);
+        if (imgs != null) {
+          int direction = (hoverFrameCounter / 60) % 4;
+          BufferedImage img = imgs[direction];
+          if (img != null) {
+            float scale = 1.5f;
+            int imgW = (int)(img.getWidth() * scale);
+            int imgH = (int)(img.getHeight() * scale);
+            int cardX = screenWidth / 2 - 160;
+            int imgX = cardX - imgW - 250; //Adjust character postion of X
+            int imgY = 320; //Adjust character postion of Y
+            g2.drawImage(img, imgX, imgY, imgW, imgH, null);
+          }
+        }
         drawStatCard(g2, CHAR_TYPES[hoveredCharIndex]);
+      } else {
+        lastHoveredIndex = -1;
       }
     }
 
     private void drawStatCard(Graphics2D g2, CharacterStats.CharacterType ct) {
-      int cardX = screenWidth / 2 + 200;
+      int cardX = screenWidth / 2 - 200; //adjust the postion of character description X
       int cardY = 280;
       int cardW = 320;
       int cardH = 220;
@@ -675,4 +748,4 @@ public class GamePanel extends JPanel implements Runnable {
     int lw = g2.getFontMetrics().stringWidth(label);
     g2.drawString(label, btn.x + btn.width / 2 - lw / 2, btn.y + 44);
   }
-  }
+}

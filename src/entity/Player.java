@@ -134,13 +134,17 @@ public class Player extends Entity {
 
             if (keyH.ePressed && !eWasPressed) {
                 eWasPressed = true;
-                gp.dialogStage++;
-                updateDialogue(color);
+                if (color == gp.COLOR_JOHNRU && !allOtherEnemiesDefeated()) {
+                    gp.currentDialog = "Johnru: come back to me when you have beaten the others";
+                } else {
+                    gp.dialogStage++;
+                    updateDialogue(color);
 
-                // Check if this was the last dialogue stage — trigger battle
-                if (isFinalDialogStage(color)) {
-                    gp.pendingBattleEnemyColor = color;
-                    gp.startFadeToBlack();
+                    // Check if this was the last dialogue stage — trigger battle
+                    if (isFinalDialogStage(color)) {
+                        gp.pendingBattleEnemyColor = color;
+                        gp.startFadeToBlack();
+                    }
                 }
             }
         } else {
@@ -158,9 +162,16 @@ public class Player extends Entity {
         if (color == gp.COLOR_JAMES)        return gp.dialogStage >= 2;
         if (color == gp.COLOR_ALIEYANDREW)  return gp.dialogStage >= 3;
         if (color == gp.COLOR_KYLE)         return gp.dialogStage >= 2;
-        if (color == gp.COLOR_JOHNRU)       return gp.dialogStage >= 3;
+        if (color == gp.COLOR_JOHNRU)       return allOtherEnemiesDefeated() && gp.dialogStage >= 2;
         if (color == gp.COLOR_ADRIAN)       return gp.dialogStage >= 3;
         return false;
+    }
+
+    private boolean allOtherEnemiesDefeated() {
+        return gp.enemyStats.isDefeated(gp.COLOR_JAMES) &&
+               gp.enemyStats.isDefeated(gp.COLOR_ALIEYANDREW) &&
+               gp.enemyStats.isDefeated(gp.COLOR_KYLE) &&
+               gp.enemyStats.isDefeated(gp.COLOR_ADRIAN);
     }
 
     private void updateDialogue(int color) {
@@ -178,10 +189,14 @@ public class Player extends Entity {
             else if (gp.dialogStage == 2) gp.currentDialog = "Kyle: HAHAHAAHAHAHAHA, COME BEAT ME FIRST";
             else                          gp.currentDialog = "";
         } else if (color == gp.COLOR_JOHNRU) {
-            if (gp.dialogStage == 1)      gp.currentDialog = "Johnru: come back to me when you have beaten the others";
-            else if (gp.dialogStage == 2) gp.currentDialog = "Johnru: Oh, you think your strong now huh, " + characterName;
-            else if (gp.dialogStage == 3) gp.currentDialog = "Johnru: Well lets go fight now, I'll let you get out of the room";
-            else                          gp.currentDialog = "";
+            if (!allOtherEnemiesDefeated()) {
+                gp.currentDialog = "Johnru: come back to me when you have beaten the others";
+                gp.dialogStage = 0; //reset to prevent progression
+            } else {
+                if (gp.dialogStage == 1)      gp.currentDialog = "Johnru: Oh, you think your strong now huh, " + characterName;
+                else if (gp.dialogStage == 2) gp.currentDialog = "Johnru: Well lets go fight now, I'll let you get out of the room";
+                else                          gp.currentDialog = "";
+            }
         } else if (color == gp.COLOR_ADRIAN) {
             if (gp.dialogStage == 1)      gp.currentDialog = "Adrian: Hi There " + characterName + ", class is over";
             else if (gp.dialogStage == 2) gp.currentDialog = "Adrian: Oh you want your money that I owe you?";
@@ -201,6 +216,15 @@ public class Player extends Entity {
             case "left":  img = isMoving ? (spriteNum == 1 ? left1  : left2)  : standLeft;  break;
             case "right": img = isMoving ? (spriteNum == 1 ? right1 : right2) : standRight; break;
         }
+        
+        //draw shadow ellipse beneath the character
+        g2.setColor(new Color(0, 0, 0, 100));
+        int shadowWidth = (int)(gp.tileSize * 0.6);
+        int shadowHeight = (int)(gp.tileSize * 0.15);
+        int shadowX = x + (gp.tileSize - shadowWidth) / 2;
+        int shadowY = y + gp.tileSize - shadowHeight - 15;
+        g2.fillOval(shadowX, shadowY, shadowWidth, shadowHeight);
+        
         g2.drawImage(img, x, y, gp.tileSize, gp.tileSize, null);
 
         if (gp.showDebug) {
