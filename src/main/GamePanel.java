@@ -427,23 +427,6 @@ public class GamePanel extends JPanel implements Runnable {
       if (color == COLOR_ADRIAN)      img = adrianStand;
 
       if (img != null) {
-        //draw shadow ellipse beneath the enemy
-        g2.setColor(new Color(0, 0, 0, 100));
-        int shadowWidth = (int)(tileSize * 0.6);
-        int shadowHeight = (int)(tileSize * 0.15);
-        int shadowX = drawX + (tileSize - shadowWidth) / 2;
-        
-        //adjust shadow offset for different characters
-        int shadowOffset = 15;
-        if (color == COLOR_KYLE || color == COLOR_JOHNRU) {
-          shadowOffset = 25;
-        } else if (color == COLOR_JAMES) {
-          shadowOffset = 20;
-        }
-        
-        int shadowY = drawY + tileSize - shadowHeight - shadowOffset;
-        g2.fillOval(shadowX, shadowY, shadowWidth, shadowHeight);
-        
         g2.drawImage(img, drawX, drawY, tileSize, tileSize, null);
       }
     }
@@ -748,4 +731,4 @@ public class GamePanel extends JPanel implements Runnable {
     int lw = g2.getFontMetrics().stringWidth(label);
     g2.drawString(label, btn.x + btn.width / 2 - lw / 2, btn.y + 44);
   }
-}
+  }
