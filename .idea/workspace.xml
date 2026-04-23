@@ -4,22 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/collision/CollisionChecker.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/entity/Enemy.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/panels/MenuPage.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/panels/SelectCharacter.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/res/sprites/ivan/ivan_back_stand - Copy.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/res/sprites/ivan/ivan_initial_select.gif" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/res/sprites/map/gle-hallway.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_walk2 - Copy.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_initial_select.gif" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/res/sprites/sam/sam_initial_select.gif" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/production/Five-Six/Main.class" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Main.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/entity/Entity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/entity/Entity.java" afterDir="false" />
+    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="adding a next level">
+      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_Mar_11,_2026_10_36_PM_[Changes]/shelved.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_Mar_11__2026_10_36_PM__Changes_.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/res/sprites/map/walkWay.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/entity/Player.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/entity/Player.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/GamePanel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/GamePanel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/res/sprites/map/gleHitboxes.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/map/gleHitboxes.png" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,6 +27,7 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="UPDATE_TYPE" value="REBASE" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
   &quot;lastFilter&quot;: {
@@ -42,12 +35,12 @@
     &quot;assignee&quot;: &quot;Ban-exe&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/kiezzyy/Five-Six",
-    "accountId": "2afa242e-bd22-489b-ae22-3834c9f8febe"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/kiezzyy/Five-Six&quot;,
+    &quot;accountId&quot;: &quot;2afa242e-bd22-489b-ae22-3834c9f8febe&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 2
 }</component>
@@ -64,7 +57,7 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "Merging main",
+    "git-widget-placeholder": "main",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/johnfiel/IdeaProjects/Five-Six/src/res/sprites/johnfiel",
@@ -72,6 +65,7 @@
     "project.structure.last.edited": "Modules",
     "project.structure.proportion": "0.15",
     "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
     "to.speed.mode.migration.done": "true"
   }
 }]]></component>
@@ -123,6 +117,32 @@
       <option name="presentableId" value="Default" />
       <updated>1772915913970</updated>
     </task>
+    <task id="LOCAL-00001" summary="fix the collision to be align inside of the table and turn the hitbox and collision into a transparent">
+      <option name="closed" value="true" />
+      <created>1775378259250</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1775378259250</updated>
+    </task>
+    <task id="LOCAL-00002" summary="adding a next level">
+      <option name="closed" value="true" />
+      <created>1776941954185</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1776941954185</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="fix the collision to be align inside of the table and turn the hitbox and collision into a transparent" />
+    <MESSAGE value="adding a next level" />
+    <option name="LAST_COMMIT_MESSAGE" value="adding a next level" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>
