@@ -17,7 +17,6 @@ public class Player extends Entity {
     public CharacterStats.CharacterType charType;
     public double damageMultiplier;
 
-    // Spawn position saved for respawn
     public int spawnX, spawnY;
 
     public Player(GamePanel gp, KeyHandler keyH, String characterName) {
@@ -85,46 +84,125 @@ public class Player extends Entity {
     }
 
     private boolean isColliding(int nx, int ny) {
+        // No collision on the placeholder walkway map
+        if (GamePanel.WALKWAY_MAP.equals(gp.currentMapName)) {
+            return false;
+        }
+
         if (gp.hitboxImage == null) return false;
-        int bw = 70, bh = gp.tileSize - 60;
-        int cx = nx + gp.tileSize / 2, sy = ny + 40;
+
+        int bw = 70;
+        int bh = gp.tileSize - 60;
+        int cx = nx + gp.tileSize / 2;
+        int sy = ny + 40;
+
         int[][] pts = {
                 {cx - bw/2, sy}, {cx - bw/2, sy + bh/3}, {cx - bw/2, sy + (2*bh)/3}, {cx - bw/2, sy + bh},
                 {cx + bw/2, sy}, {cx + bw/2, sy + bh/3}, {cx + bw/2, sy + (2*bh)/3}, {cx + bw/2, sy + bh},
                 {cx, sy}, {cx, sy + bh}
         };
+
         for (int[] p : pts) {
             int ix = p[0] * gp.hitboxImage.getWidth() / gp.getWidth();
             int iy = p[1] * gp.hitboxImage.getHeight() / gp.getHeight();
-            if (ix >= 0 && ix < gp.hitboxImage.getWidth() && iy >= 0 && iy < gp.hitboxImage.getHeight()) {
-                if ((gp.hitboxImage.getRGB(ix, iy) & 0xFFFFFF) == gp.COLOR_WALL) return true;
+
+            if (ix < 0 || ix >= gp.hitboxImage.getWidth() || iy < 0 || iy >= gp.hitboxImage.getHeight()) {
+                continue;
+            }
+
+            int color = gp.hitboxImage.getRGB(ix, iy) & 0xFFFFFF;
+
+            if (color == gp.COLOR_WALL) {
+                return true;
+            }
+
+            boolean isEnemy =
+                    color == gp.COLOR_JAMES ||
+                            color == gp.COLOR_ALIEYANDREW ||
+                            color == gp.COLOR_KYLE ||
+                            color == gp.COLOR_JOHNRU ||
+                            color == gp.COLOR_ADRIAN;
+
+            if (isEnemy && gp.enemyStats.isDefeated(color)) {
+                continue;
+            }
+
+            if (isEnemy) {
+                int enemyScreenX = (ix * gp.getWidth()) / gp.hitboxImage.getWidth();
+                int enemyScreenY = (iy * gp.getHeight()) / gp.hitboxImage.getHeight();
+
+                int enemyBoxW = 70;
+                int enemyBoxH = 70;
+                int enemyOffsetY = 45;
+
+                // Make Alieyandrew collision narrower
+                if (color == gp.COLOR_ALIEYANDREW) {
+                    enemyBoxW = 42;
+                    enemyBoxH = 62;
+                    enemyOffsetY = 48;
+                }
+
+                // Make Kyle collision shorter/lower on Y
+                if (color == gp.COLOR_KYLE) {
+                    enemyBoxW = 60;
+                    enemyBoxH = 48;
+                    enemyOffsetY = 62;
+                }
+
+                Rectangle playerBox = new Rectangle(nx + 45, ny + 40, 70, gp.tileSize - 60);
+                Rectangle enemyBox = new Rectangle(
+                        enemyScreenX - enemyBoxW / 2,
+                        enemyScreenY - gp.tileSize / 2 + enemyOffsetY,
+                        enemyBoxW,
+                        enemyBoxH
+                );
+
+                if (playerBox.intersects(enemyBox)) {
+                    return true;
+                }
             }
         }
+
         return false;
     }
+
+
+
 
     private void checkInteractions() {
         nearInteractable = false;
         if (gp.hitboxImage == null) return;
 
-        int ix = (x + gp.tileSize/2) * gp.hitboxImage.getWidth() / gp.getWidth();
-        int iy = (y + gp.tileSize/2) * gp.hitboxImage.getHeight() / gp.getHeight();
+        int interactX = x + gp.tileSize / 2;
+        int interactY = y + gp.tileSize / 2;
+
+        int interactDistance = gp.tileSize / 2;
+
+        switch (direction) {
+            case "up" -> interactY -= interactDistance;
+            case "down" -> interactY += interactDistance;
+            case "left" -> interactX -= interactDistance;
+            case "right" -> interactX += interactDistance;
+        }
+
+        int ix = interactX * gp.hitboxImage.getWidth() / gp.getWidth();
+        int iy = interactY * gp.hitboxImage.getHeight() / gp.getHeight();
 
         if (ix < 0 || ix >= gp.hitboxImage.getWidth() || iy < 0 || iy >= gp.hitboxImage.getHeight()) return;
 
         int color = gp.hitboxImage.getRGB(ix, iy) & 0xFFFFFF;
 
-        boolean isNPC = (color == gp.COLOR_JAMES || color == gp.COLOR_ALIEYANDREW ||
+        boolean isInteractable = (color == gp.COLOR_JAMES || color == gp.COLOR_ALIEYANDREW ||
                 color == gp.COLOR_KYLE  || color == gp.COLOR_JOHNRU ||
-                color == gp.COLOR_ADRIAN || color == gp.COLOR_DOOR);
+                color == gp.COLOR_ADRIAN || color == gp.COLOR_DOOR ||
+                color == gp.COLORNEXTAREA);
 
-        // Skip if already defeated
-        if (gp.enemyStats.isDefeated(color)) {
+        if (color != gp.COLORNEXTAREA && gp.enemyStats.isDefeated(color)) {
             gp.currentDialog = "";
             return;
         }
 
-        if (isNPC) {
+        if (isInteractable) {
             nearInteractable = true;
 
             if (gp.lastNPCColor != color) {
@@ -134,13 +212,23 @@ public class Player extends Entity {
 
             if (keyH.ePressed && !eWasPressed) {
                 eWasPressed = true;
-                gp.dialogStage++;
-                updateDialogue(color);
 
-                // Check if this was the last dialogue stage — trigger battle
-                if (isFinalDialogStage(color)) {
-                    gp.pendingBattleEnemyColor = color;
-                    gp.startFadeToBlack();
+                if (color == gp.COLORNEXTAREA) {
+                    if (gp.enemyStats.isDefeated(gp.COLOR_JOHNRU)) {
+                        gp.loadMap(GamePanel.WALKWAY_MAP);
+                    } else {
+                        gp.currentDialog = "You must defeat Johnru first.";
+                    }
+                } else if (color == gp.COLOR_JOHNRU && !allOtherEnemiesDefeated()) {
+                    gp.currentDialog = "Johnru: come back to me when you have beaten the others";
+                } else {
+                    gp.dialogStage++;
+                    updateDialogue(color);
+
+                    if (isFinalDialogStage(color)) {
+                        gp.pendingBattleEnemyColor = color;
+                        gp.startFadeToBlack();
+                    }
                 }
             }
         } else {
@@ -154,13 +242,21 @@ public class Player extends Entity {
         if (!keyH.ePressed) eWasPressed = false;
     }
 
+
     private boolean isFinalDialogStage(int color) {
         if (color == gp.COLOR_JAMES)        return gp.dialogStage >= 2;
         if (color == gp.COLOR_ALIEYANDREW)  return gp.dialogStage >= 3;
         if (color == gp.COLOR_KYLE)         return gp.dialogStage >= 2;
-        if (color == gp.COLOR_JOHNRU)       return gp.dialogStage >= 3;
+        if (color == gp.COLOR_JOHNRU)       return allOtherEnemiesDefeated() && gp.dialogStage >= 2;
         if (color == gp.COLOR_ADRIAN)       return gp.dialogStage >= 3;
         return false;
+    }
+
+    private boolean allOtherEnemiesDefeated() {
+        return gp.enemyStats.isDefeated(gp.COLOR_JAMES) &&
+                gp.enemyStats.isDefeated(gp.COLOR_ALIEYANDREW) &&
+                gp.enemyStats.isDefeated(gp.COLOR_KYLE) &&
+                gp.enemyStats.isDefeated(gp.COLOR_ADRIAN);
     }
 
     private void updateDialogue(int color) {
@@ -178,10 +274,14 @@ public class Player extends Entity {
             else if (gp.dialogStage == 2) gp.currentDialog = "Kyle: HAHAHAAHAHAHAHA, COME BEAT ME FIRST";
             else                          gp.currentDialog = "";
         } else if (color == gp.COLOR_JOHNRU) {
-            if (gp.dialogStage == 1)      gp.currentDialog = "Johnru: come back to me when you have beaten the others";
-            else if (gp.dialogStage == 2) gp.currentDialog = "Johnru: Oh, you think your strong now huh, " + characterName;
-            else if (gp.dialogStage == 3) gp.currentDialog = "Johnru: Well lets go fight now, I'll let you get out of the room";
-            else                          gp.currentDialog = "";
+            if (!allOtherEnemiesDefeated()) {
+                gp.currentDialog = "Johnru: come back to me when you have beaten the others";
+                gp.dialogStage = 0;
+            } else {
+                if (gp.dialogStage == 1)      gp.currentDialog = "Johnru: Oh, you think your strong now huh, " + characterName;
+                else if (gp.dialogStage == 2) gp.currentDialog = "Johnru: Well lets go fight now, I'll let you get out of the room";
+                else                          gp.currentDialog = "";
+            }
         } else if (color == gp.COLOR_ADRIAN) {
             if (gp.dialogStage == 1)      gp.currentDialog = "Adrian: Hi There " + characterName + ", class is over";
             else if (gp.dialogStage == 2) gp.currentDialog = "Adrian: Oh you want your money that I owe you?";
@@ -189,6 +289,12 @@ public class Player extends Entity {
             else                          gp.currentDialog = "";
         } else if (color == gp.COLOR_DOOR) {
             gp.currentDialog = "This door is broken and cant be opened.";
+        } else if (color == gp.COLORNEXTAREA) {
+            if (gp.enemyStats.isDefeated(gp.COLOR_JOHNRU)) {
+                gp.currentDialog = "Press E to go to the walkway.";
+            } else {
+                gp.currentDialog = "Defeat Johnru first.";
+            }
         }
     }
 
@@ -201,6 +307,14 @@ public class Player extends Entity {
             case "left":  img = isMoving ? (spriteNum == 1 ? left1  : left2)  : standLeft;  break;
             case "right": img = isMoving ? (spriteNum == 1 ? right1 : right2) : standRight; break;
         }
+
+        g2.setColor(new Color(0, 0, 0, 100));
+        int shadowWidth = (int)(gp.tileSize * 0.6);
+        int shadowHeight = (int)(gp.tileSize * 0.15);
+        int shadowX = x + (gp.tileSize - shadowWidth) / 2;
+        int shadowY = y + gp.tileSize - shadowHeight - 15;
+        g2.fillOval(shadowX, shadowY, shadowWidth, shadowHeight);
+
         g2.drawImage(img, x, y, gp.tileSize, gp.tileSize, null);
 
         if (gp.showDebug) {
