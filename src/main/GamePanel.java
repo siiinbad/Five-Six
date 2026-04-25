@@ -158,6 +158,36 @@ public class GamePanel extends JPanel implements Runnable {
             }
         });
     }
+    // THIS WILL CHANGE THE SIZE DEPENDING OF THE RESOLUTION OF THE USER
+    public double getScaleX() {
+        int currentWidth = getWidth() > 0 ? getWidth() : screenWidth;
+        return Math.max(1.0, (double) currentWidth / screenWidth);
+    }
+
+    public double getScaleY() {
+        int currentHeight = getHeight() > 0 ? getHeight() : screenHeight;
+        return Math.max(1.0, (double) currentHeight / screenHeight);
+    }
+
+    public double getUniformScale() {
+        return Math.min(getScaleX(), getScaleY());
+    }
+
+    public int scaleX(int value) {
+        return Math.max(1, (int) Math.round(value * getScaleX()));
+    }
+
+    public int scaleY(int value) {
+        return Math.max(1, (int) Math.round(value * getScaleY()));
+    }
+
+    public int scaleUniform(int value) {
+        return Math.max(1, (int) Math.round(value * getUniformScale()));
+    }
+
+    public int getScaledTileSize() {
+        return scaleUniform(tileSize);
+    }
 
     private void updateBattleButtons() {
         int bw   = 180, bh = 65;
@@ -238,11 +268,12 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void setPlayerSpawn() {
         if (hitboxImage == null) return;
+        int scaledTileSize = getScaledTileSize();
         for (int y = 0; y < hitboxImage.getHeight(); y++) {
             for (int x = 0; x < hitboxImage.getWidth(); x++) {
                 if ((hitboxImage.getRGB(x, y) & 0xFFFFFF) == COLOR_SPAWN) {
-                    player.x = (x * getWidth())  / hitboxImage.getWidth()  - (tileSize / 2);
-                    player.y = (y * getHeight()) / hitboxImage.getHeight() - (tileSize / 2);
+                    player.x = (x * getWidth())  / hitboxImage.getWidth()  - (scaledTileSize / 2);
+                    player.y = (y * getHeight()) / hitboxImage.getHeight() - (scaledTileSize / 2);
                     player.saveSpawn(player.x, player.y);
                     return;
                 }
@@ -411,6 +442,7 @@ public class GamePanel extends JPanel implements Runnable {
 
         for (int color : colorBounds.keySet()) {
             int[] b = colorBounds.get(color);
+            int scaledTileSize = getScaledTileSize();
 
             int centerX = (b[0] + b[1]) / 2;
             int centerY = (b[2] + b[3]) / 2;
@@ -418,8 +450,8 @@ public class GamePanel extends JPanel implements Runnable {
             int screenX = (centerX * getWidth()) / hitboxImage.getWidth();
             int screenY = (centerY * getHeight()) / hitboxImage.getHeight();
 
-            int drawX = screenX - (tileSize / 2);
-            int drawY = screenY - (tileSize / 2);
+            int drawX = screenX - (scaledTileSize / 2);
+            int drawY = screenY - (scaledTileSize / 2);
 
             BufferedImage img = null;
             if (color == COLOR_JAMES)       img = jamesStand;
@@ -430,21 +462,21 @@ public class GamePanel extends JPanel implements Runnable {
 
             if (img != null) {
                 g2.setColor(new Color(0, 0, 0, 100));
-                int shadowWidth = (int)(tileSize * 0.6);
-                int shadowHeight = (int)(tileSize * 0.15);
-                int shadowX = drawX + (tileSize - shadowWidth) / 2;
+                int shadowWidth = (int)(scaledTileSize * 0.6);
+                int shadowHeight = (int)(scaledTileSize * 0.15);
+                int shadowX = drawX + (scaledTileSize - shadowWidth) / 2;
 
-                int shadowOffset = 15;
+                int shadowOffset = scaleUniform(15);
                 if (color == COLOR_KYLE || color == COLOR_JOHNRU) {
-                    shadowOffset = 25;
+                    shadowOffset = scaleUniform(25);
                 } else if (color == COLOR_JAMES) {
-                    shadowOffset = 20;
+                    shadowOffset = scaleUniform(20);
                 }
 
-                int shadowY = drawY + tileSize - shadowHeight - shadowOffset;
+                int shadowY = drawY + scaledTileSize - shadowHeight - shadowOffset;
                 g2.fillOval(shadowX, shadowY, shadowWidth, shadowHeight);
 
-                g2.drawImage(img, drawX, drawY, tileSize, tileSize, null);
+                g2.drawImage(img, drawX, drawY, scaledTileSize, scaledTileSize, null);
             }
         }
     }

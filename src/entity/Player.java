@@ -16,6 +16,7 @@ public class Player extends Entity {
 
     public CharacterStats.CharacterType charType;
     public double damageMultiplier;
+    private static final int BASE_SPEED = 4;
 
     public int spawnX, spawnY;
 
@@ -29,7 +30,7 @@ public class Player extends Entity {
 
         setHP(charType.maxHP);
 
-        speed = 4;
+        speed = BASE_SPEED;
         direction = "down";
         getPlayerImage();
     }
@@ -68,13 +69,14 @@ public class Player extends Entity {
     public void update() {
         if (gp.gameState == gp.battleState || gp.gameState == gp.fadeState) return;
 
+        int moveSpeed = getScaledSpeed();
         int nextX = x, nextY = y;
         boolean moving = false;
 
-        if (keyH.upPressed)    { direction = "up";    nextY -= speed; moving = true; }
-        else if (keyH.downPressed)  { direction = "down";  nextY += speed; moving = true; }
-        else if (keyH.leftPressed)  { direction = "left";  nextX -= speed; moving = true; }
-        else if (keyH.rightPressed) { direction = "right"; nextX += speed; moving = true; }
+        if (keyH.upPressed)    { direction = "up";    nextY -= moveSpeed; moving = true; }
+        else if (keyH.downPressed)  { direction = "down";  nextY += moveSpeed; moving = true; }
+        else if (keyH.leftPressed)  { direction = "left";  nextX -= moveSpeed; moving = true; }
+        else if (keyH.rightPressed) { direction = "right"; nextX += moveSpeed; moving = true; }
 
         if (moving && !isColliding(nextX, nextY)) {
             x = nextX; y = nextY;
@@ -173,12 +175,17 @@ public class Player extends Entity {
     }
 
     private Rectangle getPlayerCollisionBox(int px, int py) {
-        return new Rectangle(px + 45, py + 40, 70, gp.tileSize - 60);
+        int spriteSize = gp.getScaledTileSize();
+        int offsetX = gp.scaleUniform(45);
+        int offsetY = gp.scaleUniform(40);
+        int width = gp.scaleUniform(70);
+        int height = Math.max(1, spriteSize - gp.scaleUniform(60));
+        return new Rectangle(px + offsetX, py + offsetY, width, height);
     }
 
     private Rectangle getInteractionBox(Rectangle playerBox) {
         Rectangle interactionBox = new Rectangle(playerBox);
-        int interactDistance = gp.tileSize / 3;
+        int interactDistance = gp.getScaledTileSize() / 3;
 
         switch (direction) {
             case "up" -> interactionBox.translate(0, -interactDistance);
@@ -188,6 +195,10 @@ public class Player extends Entity {
         }
 
         return interactionBox;
+    }
+
+    private int getScaledSpeed() {
+        return Math.max(1, gp.scaleUniform(BASE_SPEED));
     }
 
     private boolean areaContainsColor(Rectangle screenRect, int targetColor) {
@@ -337,24 +348,25 @@ public class Player extends Entity {
         }
 
         g2.setColor(new Color(0, 0, 0, 100));
-        int shadowWidth = (int)(gp.tileSize * 0.6);
-        int shadowHeight = (int)(gp.tileSize * 0.15);
-        int shadowX = x + (gp.tileSize - shadowWidth) / 2;
-        int shadowY = y + gp.tileSize - shadowHeight - 15;
+        int spriteSize = gp.getScaledTileSize();
+        int shadowWidth = (int)(spriteSize * 0.6);
+        int shadowHeight = (int)(spriteSize * 0.15);
+        int shadowX = x + (spriteSize - shadowWidth) / 2;
+        int shadowY = y + spriteSize - shadowHeight - gp.scaleUniform(15);
         g2.fillOval(shadowX, shadowY, shadowWidth, shadowHeight);
 
-        g2.drawImage(img, x, y, gp.tileSize, gp.tileSize, null);
+        g2.drawImage(img, x, y, spriteSize, spriteSize, null);
 
         if (gp.showDebug) {
             g2.setColor(Color.RED);
-            int bw = 70, bh = gp.tileSize - 60;
-            g2.drawRect(x + (gp.tileSize/2) - (bw/2), y + 40, bw, bh);
+            Rectangle collisionBox = getPlayerCollisionBox(x, y);
+            g2.drawRect(collisionBox.x, collisionBox.y, collisionBox.width, collisionBox.height);
         }
 
         if (nearInteractable && gp.currentDialog.isEmpty()) {
             g2.setColor(Color.WHITE);
-            g2.setFont(new Font("Arial", Font.BOLD, 20));
-            g2.drawString("Press E to talk", x + 10, y - 10);
+            g2.setFont(new Font("Arial", Font.BOLD, gp.scaleUniform(20)));
+            g2.drawString("Press E to talk", x + gp.scaleUniform(10), y - gp.scaleUniform(10));
         }
     }
 }
