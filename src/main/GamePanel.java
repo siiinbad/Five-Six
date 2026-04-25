@@ -1,7 +1,6 @@
 package main;
 
 import entity.*;
-
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -175,35 +174,35 @@ public class GamePanel extends JPanel implements Runnable {
             mapImage    = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/" + currentMapName + ".png")));
             hitboxImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/" + currentMapName + "Hitboxes.png")));
 
-            jamesStand       = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/james/james_stand.png")));
-            alieyandrewStand = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/alieyandrew/alieyandrew_stand.png")));
-            kyleStand        = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/kyle/kyle_stand.png")));
-            johnruStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnru/johnru_stand.png")));
-            adrianStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/adrian/adrian_stand.png")));
+            jamesStand       = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/james/james_stand.png")));
+            alieyandrewStand = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/alieyandrew/alieyandrew_stand.png")));
+            kyleStand        = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/kyle/kyle_stand.png")));
+            johnruStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/johnru/johnru_stand.png")));
+            adrianStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/adrian/adrian_stand.png")));
 
             ivanStands = new BufferedImage[4];
-            ivanStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_front_stand.png")));
-            ivanStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_left_stand.png")));
-            ivanStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_back_stand.png")));
-            ivanStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_right_stand.png")));
+            ivanStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_front_stand.png")));
+            ivanStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_left_stand.png")));
+            ivanStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_back_stand.png")));
+            ivanStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_right_stand.png")));
 
             nimuelStands = new BufferedImage[4];
-            nimuelStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_front_stand.png")));
-            nimuelStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_left_stand.png")));
-            nimuelStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_back_stand.png")));
-            nimuelStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_right_stand.png")));
+            nimuelStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_front_stand.png")));
+            nimuelStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_left_stand.png")));
+            nimuelStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_back_stand.png")));
+            nimuelStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_right_stand.png")));
 
             samStands = new BufferedImage[4];
-            samStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_front_stand.png")));
-            samStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_left_stand.png")));
-            samStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_back_stand.png")));
-            samStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_right_stand.png")));
+            samStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_front_stand.png")));
+            samStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_left_stand.png")));
+            samStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_back_stand.png")));
+            samStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_right_stand.png")));
 
             johnfielStands = new BufferedImage[4];
-            johnfielStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_front_stand.png")));
-            johnfielStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_left_stand.png")));
-            johnfielStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_back_stand.png")));
-            johnfielStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_right_stand.png")));
+            johnfielStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_front_stand.png")));
+            johnfielStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_left_stand.png")));
+            johnfielStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_back_stand.png")));
+            johnfielStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_right_stand.png")));
         } catch (Exception e) {
             System.out.println("Image loading failed.");
         }

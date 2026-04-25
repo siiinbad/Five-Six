@@ -47,7 +47,7 @@ public class Player extends Entity {
 
     public void getPlayerImage() {
         try {
-            String path = "/res/sprites/" + characterName + "/" + characterName + "_";
+            String path = "/res/sprites/player/" + characterName + "/" + characterName + "_";
             up1        = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(path + "back_walk1.png")));
             up2        = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(path + "back_walk2.png")));
             down1      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(path + "front_walk1.png")));
