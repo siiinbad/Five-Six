@@ -4,11 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="fix the code to be working again">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/entity/Player.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/entity/Player.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/res/sprites/map/gleHitboxes.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/map/gleHitboxes.png" afterDir="false" />
-    </list>
+    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="fix the interaction of the door to be accurate" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -133,14 +129,23 @@
       <option name="project" value="LOCAL" />
       <updated>1777101065158</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="fix the interaction of the door to be accurate">
+      <option name="closed" value="true" />
+      <created>1777104414087</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1777104414087</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="fix the collision to be align inside of the table and turn the hitbox and collision into a transparent" />
     <MESSAGE value="adding a next level" />
     <MESSAGE value="fix the code to be working again" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix the code to be working again" />
+    <MESSAGE value="fix the interaction of the door to be accurate" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix the interaction of the door to be accurate" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
