@@ -91,78 +91,19 @@ public class Player extends Entity {
 
         if (gp.hitboxImage == null) return false;
 
-        int bw = 70;
-        int bh = gp.tileSize - 60;
-        int cx = nx + gp.tileSize / 2;
-        int sy = ny + 40;
+        Rectangle playerBox = getPlayerCollisionBox(nx, ny);
 
-        int[][] pts = {
-                {cx - bw/2, sy}, {cx - bw/2, sy + bh/3}, {cx - bw/2, sy + (2*bh)/3}, {cx - bw/2, sy + bh},
-                {cx + bw/2, sy}, {cx + bw/2, sy + bh/3}, {cx + bw/2, sy + (2*bh)/3}, {cx + bw/2, sy + bh},
-                {cx, sy}, {cx, sy + bh}
-        };
+        if (areaContainsColor(playerBox, gp.COLOR_WALL)) {
+            return true;
+        }
 
-        for (int[] p : pts) {
-            int ix = p[0] * gp.hitboxImage.getWidth() / gp.getWidth();
-            int iy = p[1] * gp.hitboxImage.getHeight() / gp.getHeight();
-
-            if (ix < 0 || ix >= gp.hitboxImage.getWidth() || iy < 0 || iy >= gp.hitboxImage.getHeight()) {
-                continue;
-            }
-
-            int color = gp.hitboxImage.getRGB(ix, iy) & 0xFFFFFF;
-
-            if (color == gp.COLOR_WALL) {
+        for (int enemyColor : getEnemyColors()) {
+            if (!gp.enemyStats.isDefeated(enemyColor) && areaContainsColor(playerBox, enemyColor)) {
                 return true;
-            }
-
-            boolean isEnemy =
-                    color == gp.COLOR_JAMES ||
-                            color == gp.COLOR_ALIEYANDREW ||
-                            color == gp.COLOR_KYLE ||
-                            color == gp.COLOR_JOHNRU ||
-                            color == gp.COLOR_ADRIAN;
-
-            if (isEnemy && gp.enemyStats.isDefeated(color)) {
-                continue;
-            }
-
-            if (isEnemy) {
-                int enemyScreenX = (ix * gp.getWidth()) / gp.hitboxImage.getWidth();
-                int enemyScreenY = (iy * gp.getHeight()) / gp.hitboxImage.getHeight();
-
-                int enemyBoxW = 70;
-                int enemyBoxH = 70;
-                int enemyOffsetY = 45;
-
-                // Make Alieyandrew collision narrower
-                if (color == gp.COLOR_ALIEYANDREW) {
-                    enemyBoxW = 42;
-                    enemyBoxH = 62;
-                    enemyOffsetY = 48;
-                }
-
-                // Make Kyle collision shorter/lower on Y
-                if (color == gp.COLOR_KYLE) {
-                    enemyBoxW = 60;
-                    enemyBoxH = 48;
-                    enemyOffsetY = 62;
-                }
-
-                Rectangle playerBox = new Rectangle(nx + 45, ny + 40, 70, gp.tileSize - 60);
-                Rectangle enemyBox = new Rectangle(
-                        enemyScreenX - enemyBoxW / 2,
-                        enemyScreenY - gp.tileSize / 2 + enemyOffsetY,
-                        enemyBoxW,
-                        enemyBoxH
-                );
-
-                if (playerBox.intersects(enemyBox)) {
-                    return true;
-                }
             }
         }
 
+        // Doors (orange) and next area (red) stay walkable on purpose.
         return false;
     }
 
@@ -173,24 +114,13 @@ public class Player extends Entity {
         nearInteractable = false;
         if (gp.hitboxImage == null) return;
 
-        int interactX = x + gp.tileSize / 2;
-        int interactY = y + gp.tileSize / 2;
+        Rectangle playerBox = getPlayerCollisionBox(x, y);
+        Rectangle interactBox = getInteractionBox(playerBox);
 
-        int interactDistance = gp.tileSize / 2;
-
-        switch (direction) {
-            case "up" -> interactY -= interactDistance;
-            case "down" -> interactY += interactDistance;
-            case "left" -> interactX -= interactDistance;
-            case "right" -> interactX += interactDistance;
+        int color = findInteractableColor(interactBox);
+        if (color == 0) {
+            color = findInteractableColor(playerBox);
         }
-
-        int ix = interactX * gp.hitboxImage.getWidth() / gp.getWidth();
-        int iy = interactY * gp.hitboxImage.getHeight() / gp.getHeight();
-
-        if (ix < 0 || ix >= gp.hitboxImage.getWidth() || iy < 0 || iy >= gp.hitboxImage.getHeight()) return;
-
-        int color = gp.hitboxImage.getRGB(ix, iy) & 0xFFFFFF;
 
         boolean isInteractable = (color == gp.COLOR_JAMES || color == gp.COLOR_ALIEYANDREW ||
                 color == gp.COLOR_KYLE  || color == gp.COLOR_JOHNRU ||
@@ -240,6 +170,104 @@ public class Player extends Entity {
         }
 
         if (!keyH.ePressed) eWasPressed = false;
+    }
+
+    private Rectangle getPlayerCollisionBox(int px, int py) {
+        return new Rectangle(px + 45, py + 40, 70, gp.tileSize - 60);
+    }
+
+    private Rectangle getInteractionBox(Rectangle playerBox) {
+        Rectangle interactionBox = new Rectangle(playerBox);
+        int interactDistance = gp.tileSize / 3;
+
+        switch (direction) {
+            case "up" -> interactionBox.translate(0, -interactDistance);
+            case "down" -> interactionBox.translate(0, interactDistance);
+            case "left" -> interactionBox.translate(-interactDistance, 0);
+            case "right" -> interactionBox.translate(interactDistance, 0);
+        }
+
+        return interactionBox;
+    }
+
+    private boolean areaContainsColor(Rectangle screenRect, int targetColor) {
+        Rectangle imageRect = toImageRect(screenRect);
+        if (imageRect == null) return false;
+
+        for (int iy = imageRect.y; iy < imageRect.y + imageRect.height; iy++) {
+            for (int ix = imageRect.x; ix < imageRect.x + imageRect.width; ix++) {
+                int color = gp.hitboxImage.getRGB(ix, iy) & 0xFFFFFF;
+                if (color == targetColor) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private int findInteractableColor(Rectangle screenRect) {
+        Rectangle imageRect = toImageRect(screenRect);
+        if (imageRect == null) return 0;
+
+        boolean foundDoor = false;
+        boolean foundNextArea = false;
+
+        for (int iy = imageRect.y; iy < imageRect.y + imageRect.height; iy++) {
+            for (int ix = imageRect.x; ix < imageRect.x + imageRect.width; ix++) {
+                int color = gp.hitboxImage.getRGB(ix, iy) & 0xFFFFFF;
+
+                if (color == gp.COLOR_DOOR) {
+                    foundDoor = true;
+                    continue;
+                }
+
+                if (color == gp.COLORNEXTAREA) {
+                    foundNextArea = true;
+                    continue;
+                }
+
+                for (int enemyColor : getEnemyColors()) {
+                    if (color == enemyColor && !gp.enemyStats.isDefeated(enemyColor)) {
+                        return enemyColor;
+                    }
+                }
+            }
+        }
+
+        if (foundDoor) return gp.COLOR_DOOR;
+        if (foundNextArea) return gp.COLORNEXTAREA;
+        return 0;
+    }
+
+    private Rectangle toImageRect(Rectangle screenRect) {
+        if (gp.hitboxImage == null || gp.getWidth() <= 0 || gp.getHeight() <= 0) {
+            return null;
+        }
+
+        int imageWidth = gp.hitboxImage.getWidth();
+        int imageHeight = gp.hitboxImage.getHeight();
+
+        int left = Math.max(0, screenRect.x * imageWidth / gp.getWidth());
+        int top = Math.max(0, screenRect.y * imageHeight / gp.getHeight());
+        int right = Math.min(imageWidth - 1, ((screenRect.x + screenRect.width - 1) * imageWidth) / gp.getWidth());
+        int bottom = Math.min(imageHeight - 1, ((screenRect.y + screenRect.height - 1) * imageHeight) / gp.getHeight());
+
+        if (left > right || top > bottom) {
+            return null;
+        }
+
+        return new Rectangle(left, top, right - left + 1, bottom - top + 1);
+    }
+
+    private int[] getEnemyColors() {
+        return new int[] {
+                gp.COLOR_JAMES,
+                gp.COLOR_ALIEYANDREW,
+                gp.COLOR_KYLE,
+                gp.COLOR_JOHNRU,
+                gp.COLOR_ADRIAN
+        };
     }
 
 

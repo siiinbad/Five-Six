@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="added more bugs to fix later(i added collision and next map)">
+    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="fix the code to be working again">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/entity/Player.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/entity/Player.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/GamePanel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/GamePanel.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/res/sprites/map/gleHitboxes.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/map/gleHitboxes.png" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -126,13 +125,22 @@
       <option name="project" value="LOCAL" />
       <updated>1776941954185</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="fix the code to be working again">
+      <option name="closed" value="true" />
+      <created>1777101065158</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1777101065158</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="fix the collision to be align inside of the table and turn the hitbox and collision into a transparent" />
     <MESSAGE value="adding a next level" />
-    <option name="LAST_COMMIT_MESSAGE" value="adding a next level" />
+    <MESSAGE value="fix the code to be working again" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix the code to be working again" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
