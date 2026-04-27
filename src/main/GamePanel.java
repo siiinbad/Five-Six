@@ -189,6 +189,15 @@ public class GamePanel extends JPanel implements Runnable {
         return scaleUniform(tileSize);
     }
 
+    // MAP DISPLAY NAME HELPER
+    private String getMapDisplayName() {
+        return switch(currentMapName) {
+            case "gle" -> "GLE Building";
+            case "walkway" -> "WalkWay";
+            default -> "Unknown";
+        };
+    }
+
     private void updateBattleButtons() {
         int bw   = 180, bh = 65;
         int midX = getWidth() / 2;
@@ -616,6 +625,11 @@ public class GamePanel extends JPanel implements Runnable {
         if (!currentDialog.isEmpty()) {
             drawDialogBox(g2, currentDialog);
         }
+
+        // Draw map name GUI
+        if (player != null) {
+            drawMapNameGUI(g2);
+        }
     }
 
     private void drawHPBar(Graphics2D g2, int x, int y, int w, int h, int current, int max, String label) {
@@ -635,6 +649,35 @@ public class GamePanel extends JPanel implements Runnable {
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 16));
         g2.drawString(label + "  " + current + " / " + max, x, y + 14);
+    }
+
+    private void drawMapNameGUI(Graphics2D g2) {
+        String mapName = getMapDisplayName();
+
+
+        // GUI dimensions
+        int boxWidth = 280;
+        int boxHeight = 60;
+        int boxX = (getWidth() / 2) - (boxWidth / 2);  // Center horizontally
+        int boxY = 30;  // Near top of screen
+
+        // Draw background box with semi-transparent dark background
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.fillRoundRect(boxX, boxY, boxWidth, boxHeight, 15, 15);
+
+        // Draw border
+        g2.setColor(new Color(200, 150, 50));  // Gold/bronze border color
+        g2.setStroke(new BasicStroke(3));
+        g2.drawRoundRect(boxX, boxY, boxWidth, boxHeight, 15, 15);
+
+        // Draw text
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.BOLD, 24));
+        FontMetrics fm = g2.getFontMetrics();
+        String displayText = "[" + mapName + "]";
+        int textX = boxX + (boxWidth - fm.stringWidth(displayText)) / 2;  // Center text horizontally
+        int textY = boxY + ((boxHeight - fm.getHeight()) / 2) + fm.getAscent();  // Center text vertically
+        g2.drawString(displayText, textX, textY);
     }
 
     private void drawDialogBox(Graphics2D g2, String text) {
