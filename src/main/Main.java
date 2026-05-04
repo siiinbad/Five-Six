@@ -1,8 +1,8 @@
 package main;
 
-import javax.swing.JFrame;
-import java.awt.GraphicsEnvironment;
 import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import javax.swing.JFrame;
 
 public class Main {
     public static void main(String[] args) {
@@ -23,5 +23,7 @@ public class Main {
 
         window.setVisible(true);
         gamePanel.startGameThread();
+
+        
     }
 }
