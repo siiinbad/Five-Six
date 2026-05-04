@@ -473,7 +473,7 @@ public class GamePanel extends JPanel implements Runnable {
         waitingForNext = false;
         enemyName = "";
         loadImages();
-        
+
     }
 
     public void setPlayerSpawn() {
@@ -638,7 +638,7 @@ public class GamePanel extends JPanel implements Runnable {
             if (delta >= 1) {
                 if (gameState == playState) {
                     player.update();
-                    if (keyH.f1Pressed && !f1WasPressed) { 
+                    if (keyH.f1Pressed && !f1WasPressed) {
                         showDebug = !showDebug; f1WasPressed = true; }
                     if (!keyH.f1Pressed) f1WasPressed = false;
                 }
@@ -922,6 +922,33 @@ public class GamePanel extends JPanel implements Runnable {
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 16));
         g2.drawString(label + "  " + current + " / " + max, x, y + 14);
+    }
+
+    public int getScaledTileSize() {
+        return tileSize;
+    }
+
+    public int scaleUniform(int value) {
+        return Math.max(1, value * scale);
+    }
+
+    private void drawMapNameGUI(Graphics2D g2) {
+        String label = currentMapName.toUpperCase();
+        int fontSize = scaleUniform(24);
+        g2.setFont(new Font("Arial", Font.BOLD, fontSize));
+        int textWidth = g2.getFontMetrics().stringWidth(label);
+        int padding = scaleUniform(12);
+        int boxWidth = textWidth + padding * 2;
+        int boxHeight = fontSize + padding;
+        int bx = padding;
+        int by = padding;
+
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.fillRoundRect(bx, by, boxWidth, boxHeight, scaleUniform(12), scaleUniform(12));
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(Math.max(1, scaleUniform(2))));
+        g2.drawRoundRect(bx, by, boxWidth, boxHeight, scaleUniform(12), scaleUniform(12));
+        g2.drawString(label, bx + padding, by + fontSize);
     }
 
     private void drawDialogBox(Graphics2D g2, String text) {
