@@ -35,9 +35,11 @@ public class GamePanel extends JPanel implements Runnable {
     public BufferedImage muteIdleImage, muteHoverImage;
     public BufferedImage settingsIdleImage, settingsHoverImage;
     public BufferedImage[] characterButtonIdleImages, characterButtonHoverImages;
+    public BufferedImage[] characterSelectImages;
+    public BufferedImage menuStartHitboxImage, menuGuiHitboxImage, menuCharacterSelectHitboxImage;
     public String currentMapName = "gle";
     public static final String START_MAP = "gle";
-    public static final String WALKWAY_MAP = "walkway";
+    public static final String WALKWAY_MAP = "walkWay";
 
     // NPC IMAGES
     public BufferedImage jamesStand, alieyandrewStand, kyleStand, johnruStand, adrianStand;
@@ -64,6 +66,7 @@ public class GamePanel extends JPanel implements Runnable {
     public final int COLOR_CHAR_SAM    = 0xFFE679;
     public final int COLOR_CHAR_NIMUEL = 0xFFADAD;
     public final int COLOR_CHAR_JOHNFIEL = 0x0EFC7B;
+    private static final int COLOR_CHAR_PREVIEW = 0x078F00;
 
     // GAME STATES
     public int gameState;
@@ -250,37 +253,80 @@ public class GamePanel extends JPanel implements Runnable {
             mapImage    = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/" + currentMapName + ".png")));
             hitboxImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/" + currentMapName + "Hitboxes.png")));
 
-            jamesStand       = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/james/james_stand.png")));
-            alieyandrewStand = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/alieyandrew/alieyandrew_stand.png")));
-            kyleStand        = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/kyle/kyle_stand.png")));
-            johnruStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnru/johnru_stand.png")));
-            adrianStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/adrian/adrian_stand.png")));
+            jamesStand       = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/james/james_stand.png")));
+            alieyandrewStand = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/alieyandrew/alieyandrew_stand.png")));
+            kyleStand        = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/kyle/kyle_stand.png")));
+            johnruStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/johnru/johnru_stand.png")));
+            adrianStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/adrian/adrian_stand.png")));
 
             ivanStands = new BufferedImage[4];
-            ivanStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_front_stand.png")));
-            ivanStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_left_stand.png")));
-            ivanStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_back_stand.png")));
-            ivanStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/ivan/ivan_right_stand.png")));
+            ivanStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_front_stand.png")));
+            ivanStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_left_stand.png")));
+            ivanStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_back_stand.png")));
+            ivanStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_right_stand.png")));
 
             nimuelStands = new BufferedImage[4];
-            nimuelStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_front_stand.png")));
-            nimuelStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_left_stand.png")));
-            nimuelStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_back_stand.png")));
-            nimuelStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_right_stand.png")));
+            nimuelStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_front_stand.png")));
+            nimuelStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_left_stand.png")));
+            nimuelStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_back_stand.png")));
+            nimuelStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_right_stand.png")));
 
             samStands = new BufferedImage[4];
-            samStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_front_stand.png")));
-            samStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_left_stand.png")));
-            samStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_back_stand.png")));
-            samStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/sam/sam_right_stand.png")));
+            samStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_front_stand.png")));
+            samStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_left_stand.png")));
+            samStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_back_stand.png")));
+            samStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_right_stand.png")));
 
             johnfielStands = new BufferedImage[4];
-            johnfielStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_front_stand.png")));
-            johnfielStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_left_stand.png")));
-            johnfielStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_back_stand.png")));
-            johnfielStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/johnfiel/johnfiel_right_stand.png")));
+            johnfielStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_front_stand.png")));
+            johnfielStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_left_stand.png")));
+            johnfielStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_back_stand.png")));
+            johnfielStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_right_stand.png")));
+            menuBackgroundImage = readImage("/res/sprites/menu/gui/menu_screen.png");
+            menuLogoImage = readImage("/res/sprites/menu/gui/fixsix_log.png");
+
+            startIdleImage = readImage("/res/sprites/menu/button/start_idle.png");
+            startHoverImage = readImage("/res/sprites/menu/button/start_hover.png");
+            creditsIdleImage = readImage("/res/sprites/menu/button/credits_idle.png");
+            creditsHoverImage = readImage("/res/sprites/menu/button/credits_hover.png");
+            quitIdleImage = readImage("/res/sprites/menu/button/quit_idle.png");
+            quitHoverImage = readImage("/res/sprites/menu/button/quit_hover.png");
+            continueIdleImage = readImage("/res/sprites/menu/button/continue_idle.png");
+            continueHoverImage = readImage("/res/sprites/menu/button/continue_hover.png");
+            selectCharacterIdleImage = readImage("/res/sprites/menu/button/selectcharacter_idle.png");
+            selectCharacterHoverImage = readImage("/res/sprites/menu/button/selectcharacter_hover.png");
+            muteIdleImage = readImage("/res/sprites/menu/button/mute_idle.png");
+            muteHoverImage = readImage("/res/sprites/menu/button/mute_hover.png");
+            settingsIdleImage = readImage("/res/sprites/menu/button/settings_idle.png");
+            settingsHoverImage = readImage("/res/sprites/menu/button/settings_hover.png");
+
+            characterButtonIdleImages = new BufferedImage[] {
+                    readImage("/res/sprites/menu/buttonPlayer/ivan_idle.png"),
+                    readImage("/res/sprites/menu/buttonPlayer/nimuel_idle.png"),
+                    readImage("/res/sprites/menu/buttonPlayer/sam_idle.png"),
+                    readImage("/res/sprites/menu/buttonPlayer/johnfiel_idle.png")
+            };
+
+            characterButtonHoverImages = new BufferedImage[] {
+                    readImage("/res/sprites/menu/buttonPlayer/ivan_hover.png"),
+                    readImage("/res/sprites/menu/buttonPlayer/nimuel_hover.png"),
+                    readImage("/res/sprites/menu/buttonPlayer/sam_hover.png"),
+                    readImage("/res/sprites/menu/buttonPlayer/johnfiel_hover.png")
+            };
+
+            characterSelectImages = new BufferedImage[] {
+                    makeWhiteTransparent(readImage("/res/sprites/menu/menuCharacterSelect/ivan_selectcharacter.png")),
+                    makeWhiteTransparent(readImage("/res/sprites/menu/menuCharacterSelect/nimuel_selectcharacter.png")),
+                    makeWhiteTransparent(readImage("/res/sprites/menu/menuCharacterSelect/sam_selectcharacter.png")),
+                    makeWhiteTransparent(readImage("/res/sprites/menu/menuCharacterSelect/johnfiel_selectcharacter.png"))
+            };
+
+            menuStartHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_start_hitbox.png");
+            menuGuiHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_gui_hitbox.png");
+            menuCharacterSelectHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_characterselect_hitbox.png");
         } catch (Exception e) {
             System.out.println("Image loading failed.");
+            e.printStackTrace();
         }
     }
 
@@ -340,6 +386,13 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private int getCharacterIndexAt(Point p) {
+        int color = getMenuColorAt(p, menuCharacterSelectHitboxImage);
+
+        if (color == COLOR_CHAR_IVAN) return 0;
+        if (color == COLOR_CHAR_NIMUEL) return 1;
+        if (color == COLOR_CHAR_SAM) return 2;
+        if (color == COLOR_CHAR_JOHNFIEL) return 3;
+
         if (containsBasePoint(ivanBtn, p)) return 0;
         if (containsBasePoint(nimuelBtn, p)) return 1;
         if (containsBasePoint(samBtn, p)) return 2;
@@ -419,6 +472,29 @@ public class GamePanel extends JPanel implements Runnable {
         int sw = Math.max(1, (maxX - minX + 1) * getWidth() / image.getWidth());
         int sh = Math.max(1, (maxY - minY + 1) * getHeight() / image.getHeight());
         return new Rectangle(sx, sy, sw, sh);
+    }
+
+    private Rectangle getImageColorBounds(BufferedImage image, int targetColor) {
+        if (image == null) return null;
+
+        int minX = image.getWidth();
+        int minY = image.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                if ((image.getRGB(x, y) & 0xFFFFFF) == targetColor) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+
+        if (maxX < minX || maxY < minY) return null;
+        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
     private void quitGame() {
@@ -785,12 +861,43 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void drawCharacterSelectScreen(Graphics2D g2) {
         drawMenuBase(g2);
+        drawCharacterPreview(g2);
         drawCharacterButton(g2, ivanBtn, 0);
         drawCharacterButton(g2, samBtn, 2);
         drawCharacterButton(g2, nimuelBtn, 1);
         drawCharacterButton(g2, johnfielBtn, 3);
         drawMenuIconButton(g2, muteBtn, muteIdleImage, muteHoverImage, "mute");
         drawMenuIconButton(g2, settingsBtn, settingsIdleImage, settingsHoverImage, "settings");
+    }
+
+    private void drawCharacterPreview(Graphics2D g2) {
+        if (hoveredCharIndex < 0 || characterSelectImages == null) return;
+        if (hoveredCharIndex >= characterSelectImages.length) return;
+
+        BufferedImage image = characterSelectImages[hoveredCharIndex];
+        Rectangle sourceBounds = getImageColorBounds(menuCharacterSelectHitboxImage, COLOR_CHAR_PREVIEW);
+        Rectangle screenBounds = getColorBounds(menuCharacterSelectHitboxImage, COLOR_CHAR_PREVIEW);
+
+        if (image == null || sourceBounds == null || screenBounds == null) return;
+
+        double previewScale = 0.78;
+        int targetWidth = (int) (screenBounds.width * previewScale);
+        int targetHeight = (int) (screenBounds.height * previewScale);
+        int targetX = screenBounds.x + (screenBounds.width - targetWidth) / 2;
+        int targetY = screenBounds.y + (screenBounds.height - targetHeight) / 2;
+
+        g2.drawImage(
+                image,
+                targetX,
+                targetY,
+                targetX + targetWidth,
+                targetY + targetHeight,
+                sourceBounds.x,
+                sourceBounds.y,
+                sourceBounds.x + sourceBounds.width,
+                sourceBounds.y + sourceBounds.height,
+                null
+        );
     }
 
     private void drawMenuBase(Graphics2D g2) {
@@ -925,11 +1032,15 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     public int getScaledTileSize() {
-        return tileSize;
+        if (getHeight() <= 0) {
+            return tileSize;
+        }
+
+        return Math.max(1, tileSize * getHeight() / 1080);
     }
 
     public int scaleUniform(int value) {
-        return Math.max(1, value * scale);
+        return Math.max(1, value * getScaledTileSize() / tileSize);
     }
 
     private void drawMapNameGUI(Graphics2D g2) {

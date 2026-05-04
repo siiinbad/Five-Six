@@ -198,7 +198,7 @@ public class Player extends Entity {
     }
 
     private int getScaledSpeed() {
-        return Math.max(1, gp.scaleUniform(BASE_SPEED));
+        return Math.max(1, BASE_SPEED * gp.getScaledTileSize() / gp.tileSize);
     }
 
     private boolean areaContainsColor(Rectangle screenRect, int targetColor) {
