@@ -18,6 +18,7 @@ public class GamePanel extends JPanel implements Runnable {
     final int originalTileSize = 16;
     final int scale = 10;
     public final int tileSize = originalTileSize * scale;
+    private static final double CHARACTER_SCALE_BOOST = 1.25;
     public int screenWidth  = tileSize * 16;
     public int screenHeight = tileSize * 12;
 
@@ -25,7 +26,7 @@ public class GamePanel extends JPanel implements Runnable {
     public KeyHandler keyH = new KeyHandler(this);
     Thread gameThread;
     public Player player;
-    public BufferedImage mapImage, hitboxImage;
+    public BufferedImage mapImage, hitboxImage, mapTitleImage;
     public BufferedImage menuBackgroundImage, menuLogoImage;
     public BufferedImage startIdleImage, startHoverImage;
     public BufferedImage creditsIdleImage, creditsHoverImage;
@@ -60,6 +61,7 @@ public class GamePanel extends JPanel implements Runnable {
     public final int COLOR_MENU_START  = 0x51FFD5;
     public final int COLOR_MENU_CREDIT = 0x00FF7D;
     public final int COLOR_MENU_QUIT   = 0x0DA100;
+    public final int COLOR_MENU_LOGO   = 0xBA8D7D;
     public final int COLOR_CONTINUE    = 0xCE74FF;
     public final int COLOR_SELECT_CHAR = 0x47B2FF;
     public final int COLOR_CHAR_IVAN   = 0xFF0000;
@@ -93,6 +95,8 @@ public class GamePanel extends JPanel implements Runnable {
     private int hoveredCharIndex = -1;
     private int hoveredMenuColor = 0;
     private String hoveredMenuButton = "";
+    private int menuMuteColor = 0;
+    private int menuSettingsColor = 0;
     private int hoverFrameCounter = 0;
     private int lastHoveredIndex = -1;
     private static final CharacterStats.CharacterType[] CHAR_TYPES = {
@@ -188,6 +192,10 @@ public class GamePanel extends JPanel implements Runnable {
                 }
 
                 if (gameState == characterSelectState) {
+                    String menuButton = getCharacterSelectButtonAt(p);
+                    if ("mute".equals(menuButton) || "settings".equals(menuButton)) {
+                        return;
+                    }
                     String selectedCharacter = getCharacterNameAt(p);
                     if (selectedCharacter != null) {
                         selectChar(selectedCharacter);
@@ -231,7 +239,7 @@ public class GamePanel extends JPanel implements Runnable {
                     return;
                 }
                 if (gameState != characterSelectState) return;
-                hoveredMenuButton = "";
+                hoveredMenuButton = getCharacterSelectButtonAt(p);
                 hoveredCharIndex = getCharacterIndexAt(p);
                 if (hoveredCharIndex != prevChar || !hoveredMenuButton.equals(prevButton)) repaint();
             }
@@ -252,6 +260,7 @@ public class GamePanel extends JPanel implements Runnable {
         try {
             mapImage    = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/" + currentMapName + ".png")));
             hitboxImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/" + currentMapName + "Hitboxes.png")));
+            mapTitleImage = readOptionalImage("/res/sprites/map/" + currentMapName + "_title.png");
 
             jamesStand       = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/james/james_stand.png")));
             alieyandrewStand = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/alieyandrew/alieyandrew_stand.png")));
@@ -315,15 +324,16 @@ public class GamePanel extends JPanel implements Runnable {
             };
 
             characterSelectImages = new BufferedImage[] {
-                    makeWhiteTransparent(readImage("/res/sprites/menu/menuCharacterSelect/ivan_selectcharacter.png")),
-                    makeWhiteTransparent(readImage("/res/sprites/menu/menuCharacterSelect/nimuel_selectcharacter.png")),
-                    makeWhiteTransparent(readImage("/res/sprites/menu/menuCharacterSelect/sam_selectcharacter.png")),
-                    makeWhiteTransparent(readImage("/res/sprites/menu/menuCharacterSelect/johnfiel_selectcharacter.png"))
+                    readImage("/res/sprites/menu/menuCharacterSelect/ivan_selectcharacter.png"),
+                    readImage("/res/sprites/menu/menuCharacterSelect/nimuel_selectcharacter.png"),
+                    readImage("/res/sprites/menu/menuCharacterSelect/sam_selectcharacter.png"),
+                    readImage("/res/sprites/menu/menuCharacterSelect/johnfiel_selectcharacter.png")
             };
 
             menuStartHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_start_hitbox.png");
             menuGuiHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_gui_hitbox.png");
             menuCharacterSelectHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_characterselect_hitbox.png");
+            refreshMenuIconColors();
         } catch (Exception e) {
             System.out.println("Image loading failed.");
             e.printStackTrace();
@@ -332,6 +342,16 @@ public class GamePanel extends JPanel implements Runnable {
 
     private BufferedImage readImage(String path) throws Exception {
         return ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(path)));
+    }
+
+    private BufferedImage readOptionalImage(String path) {
+        try {
+            java.io.InputStream stream = getClass().getResourceAsStream(path);
+            if (stream == null) return null;
+            return ImageIO.read(stream);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private BufferedImage makeWhiteTransparent(BufferedImage source) {
@@ -356,6 +376,25 @@ public class GamePanel extends JPanel implements Runnable {
         return new Point(baseX, baseY);
     }
 
+    private int getHitboxColorAtBaseRectCenter(BufferedImage hitbox, Rectangle baseRect) {
+        if (hitbox == null || baseRect == null) return 0;
+        int centerBaseX = baseRect.x + baseRect.width / 2;
+        int centerBaseY = baseRect.y + baseRect.height / 2;
+        int imageX = Math.min(hitbox.getWidth() - 1, Math.max(0, centerBaseX * hitbox.getWidth() / 500));
+        int imageY = Math.min(hitbox.getHeight() - 1, Math.max(0, centerBaseY * hitbox.getHeight() / 342));
+        return hitbox.getRGB(imageX, imageY) & 0xFFFFFF;
+    }
+
+    private void refreshMenuIconColors() {
+        menuMuteColor = getHitboxColorAtBaseRectCenter(menuCharacterSelectHitboxImage, muteBtn);
+        menuSettingsColor = getHitboxColorAtBaseRectCenter(menuCharacterSelectHitboxImage, settingsBtn);
+
+        if (menuMuteColor == 0) menuMuteColor = getHitboxColorAtBaseRectCenter(menuGuiHitboxImage, muteBtn);
+        if (menuSettingsColor == 0) menuSettingsColor = getHitboxColorAtBaseRectCenter(menuGuiHitboxImage, settingsBtn);
+        if (menuMuteColor == 0) menuMuteColor = getHitboxColorAtBaseRectCenter(menuStartHitboxImage, muteBtn);
+        if (menuSettingsColor == 0) menuSettingsColor = getHitboxColorAtBaseRectCenter(menuStartHitboxImage, settingsBtn);
+    }
+
     private Rectangle toScreenRect(Rectangle baseRect) {
         int x = baseRect.x * getWidth() / 500;
         int y = baseRect.y * getHeight() / 342;
@@ -369,17 +408,80 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private String getMainMenuButtonAt(Point p) {
-        if (containsBasePoint(startBtn, p)) return "start";
-        if (containsBasePoint(creditsBtn, p)) return "credits";
-        if (containsBasePoint(quitBtn, p)) return "quit";
+        int color = getMenuColorAt(p, menuStartHitboxImage);
+        if (color == COLOR_MENU_START) {
+            hoveredMenuColor = color;
+            return "start";
+        }
+        if (color == COLOR_MENU_CREDIT) {
+            hoveredMenuColor = color;
+            return "credits";
+        }
+        if (color == COLOR_MENU_QUIT) {
+            hoveredMenuColor = color;
+            return "quit";
+        }
+        if (color == COLOR_MENU_LOGO) {
+            hoveredMenuColor = color;
+            return "logo";
+        }
+        if (menuMuteColor != 0 && color == menuMuteColor) {
+            hoveredMenuColor = color;
+            return "mute";
+        }
+        if (menuSettingsColor != 0 && color == menuSettingsColor) {
+            hoveredMenuColor = color;
+            return "settings";
+        }
+
+        if (containsBasePoint(startBtn, p)) {
+            hoveredMenuColor = COLOR_MENU_START;
+            return "start";
+        }
+        if (containsBasePoint(creditsBtn, p)) {
+            hoveredMenuColor = COLOR_MENU_CREDIT;
+            return "credits";
+        }
+        if (containsBasePoint(quitBtn, p)) {
+            hoveredMenuColor = COLOR_MENU_QUIT;
+            return "quit";
+        }
+
+        hoveredMenuColor = 0;
         if (containsBasePoint(muteBtn, p)) return "mute";
         if (containsBasePoint(settingsBtn, p)) return "settings";
         return "";
     }
 
     private String getStartMenuButtonAt(Point p) {
-        if (containsBasePoint(continueMenuBtn, p)) return "continue";
-        if (containsBasePoint(selectCharacterBtn, p)) return "selectCharacter";
+        int color = getMenuColorAt(p, menuGuiHitboxImage);
+        if (color == COLOR_CONTINUE) {
+            hoveredMenuColor = color;
+            return "continue";
+        }
+        if (color == COLOR_SELECT_CHAR) {
+            hoveredMenuColor = color;
+            return "selectCharacter";
+        }
+        if (menuMuteColor != 0 && color == menuMuteColor) {
+            hoveredMenuColor = color;
+            return "mute";
+        }
+        if (menuSettingsColor != 0 && color == menuSettingsColor) {
+            hoveredMenuColor = color;
+            return "settings";
+        }
+
+        if (containsBasePoint(continueMenuBtn, p)) {
+            hoveredMenuColor = COLOR_CONTINUE;
+            return "continue";
+        }
+        if (containsBasePoint(selectCharacterBtn, p)) {
+            hoveredMenuColor = COLOR_SELECT_CHAR;
+            return "selectCharacter";
+        }
+
+        hoveredMenuColor = 0;
         if (containsBasePoint(muteBtn, p)) return "mute";
         if (containsBasePoint(settingsBtn, p)) return "settings";
         return "";
@@ -398,6 +500,23 @@ public class GamePanel extends JPanel implements Runnable {
         if (containsBasePoint(samBtn, p)) return 2;
         if (containsBasePoint(johnfielBtn, p)) return 3;
         return -1;
+    }
+
+    private String getCharacterSelectButtonAt(Point p) {
+        int color = getMenuColorAt(p, menuCharacterSelectHitboxImage);
+        if (menuMuteColor != 0 && color == menuMuteColor) {
+            hoveredMenuColor = color;
+            return "mute";
+        }
+        if (menuSettingsColor != 0 && color == menuSettingsColor) {
+            hoveredMenuColor = color;
+            return "settings";
+        }
+
+        hoveredMenuColor = 0;
+        if (containsBasePoint(muteBtn, p)) return "mute";
+        if (containsBasePoint(settingsBtn, p)) return "settings";
+        return "";
     }
 
     private String getCharacterNameAt(Point p) {
@@ -490,6 +609,29 @@ public class GamePanel extends JPanel implements Runnable {
                     if (y < minY) minY = y;
                     if (y > maxY) maxY = y;
                 }
+            }
+        }
+
+        if (maxX < minX || maxY < minY) return null;
+        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+
+    private Rectangle getNonTransparentBounds(BufferedImage image) {
+        if (image == null) return null;
+
+        int minX = image.getWidth();
+        int minY = image.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int alpha = (image.getRGB(x, y) >>> 24) & 0xFF;
+                if (alpha == 0) continue;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
             }
         }
 
@@ -849,6 +991,7 @@ public class GamePanel extends JPanel implements Runnable {
         drawMenuButton(g2, quitBtn, quitIdleImage, quitHoverImage, "quit");
         drawMenuIconButton(g2, muteBtn, muteIdleImage, muteHoverImage, "mute");
         drawMenuIconButton(g2, settingsBtn, settingsIdleImage, settingsHoverImage, "settings");
+        drawMenuHoverOutline(g2, menuStartHitboxImage);
     }
 
     private void drawStartMenuScreen(Graphics2D g2) {
@@ -857,6 +1000,7 @@ public class GamePanel extends JPanel implements Runnable {
         drawMenuButton(g2, selectCharacterBtn, selectCharacterIdleImage, selectCharacterHoverImage, "selectCharacter");
         drawMenuIconButton(g2, muteBtn, muteIdleImage, muteHoverImage, "mute");
         drawMenuIconButton(g2, settingsBtn, settingsIdleImage, settingsHoverImage, "settings");
+        drawMenuHoverOutline(g2, menuGuiHitboxImage);
     }
 
     private void drawCharacterSelectScreen(Graphics2D g2) {
@@ -875,14 +1019,18 @@ public class GamePanel extends JPanel implements Runnable {
         if (hoveredCharIndex >= characterSelectImages.length) return;
 
         BufferedImage image = characterSelectImages[hoveredCharIndex];
-        Rectangle sourceBounds = getImageColorBounds(menuCharacterSelectHitboxImage, COLOR_CHAR_PREVIEW);
+        Rectangle sourceBounds = getNonTransparentBounds(image);
         Rectangle screenBounds = getColorBounds(menuCharacterSelectHitboxImage, COLOR_CHAR_PREVIEW);
 
         if (image == null || sourceBounds == null || screenBounds == null) return;
 
-        double previewScale = 0.78;
-        int targetWidth = (int) (screenBounds.width * previewScale);
-        int targetHeight = (int) (screenBounds.height * previewScale);
+        // Fit character art into the preview box while preserving aspect ratio.
+        double boxScale = 0.90;
+        int availableWidth = Math.max(1, (int) Math.round(screenBounds.width * boxScale));
+        int availableHeight = Math.max(1, (int) Math.round(screenBounds.height * boxScale));
+        double fitScale = Math.min((double) availableWidth / sourceBounds.width, (double) availableHeight / sourceBounds.height);
+        int targetWidth = Math.max(1, (int) Math.round(sourceBounds.width * fitScale));
+        int targetHeight = Math.max(1, (int) Math.round(sourceBounds.height * fitScale));
         int targetX = screenBounds.x + (screenBounds.width - targetWidth) / 2;
         int targetY = screenBounds.y + (screenBounds.height - targetHeight) / 2;
 
@@ -916,7 +1064,26 @@ public class GamePanel extends JPanel implements Runnable {
     private void drawCharacterButton(Graphics2D g2, Rectangle bounds, int index) {
         if (characterButtonIdleImages == null || characterButtonHoverImages == null) return;
         BufferedImage image = hoveredCharIndex == index ? characterButtonHoverImages[index] : characterButtonIdleImages[index];
+        int characterColor = getCharacterColorByIndex(index);
+        Rectangle screenBounds = getColorBounds(menuCharacterSelectHitboxImage, characterColor);
+
+        if (screenBounds != null) {
+            g2.drawImage(image, screenBounds.x, screenBounds.y, screenBounds.width, screenBounds.height, null);
+            return;
+        }
+
+        // Fallback to fixed base rectangles if the hitbox color is missing.
         drawBaseImage(g2, image, bounds);
+    }
+
+    private int getCharacterColorByIndex(int index) {
+        return switch (index) {
+            case 0 -> COLOR_CHAR_IVAN;
+            case 1 -> COLOR_CHAR_NIMUEL;
+            case 2 -> COLOR_CHAR_SAM;
+            case 3 -> COLOR_CHAR_JOHNFIEL;
+            default -> 0;
+        };
     }
 
     private void drawBaseImage(Graphics2D g2, BufferedImage image, Rectangle baseRect) {
@@ -936,6 +1103,10 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void drawMenuHoverOutline(Graphics2D g2, BufferedImage hitboxImage) {
         if (hoveredMenuColor == 0) return;
+        if (gameState == characterSelectState) return;
+        if (hoveredMenuColor == COLOR_MENU_LOGO) return;
+        if ((menuMuteColor != 0 && hoveredMenuColor == menuMuteColor) ||
+                (menuSettingsColor != 0 && hoveredMenuColor == menuSettingsColor)) return;
         Rectangle bounds = getColorBounds(hitboxImage, hoveredMenuColor);
         if (bounds == null) return;
 
@@ -1036,7 +1207,8 @@ public class GamePanel extends JPanel implements Runnable {
             return tileSize;
         }
 
-        return Math.max(1, tileSize * getHeight() / 1080);
+        int baseScaledTileSize = Math.max(1, tileSize * getHeight() / 1080);
+        return Math.max(1, (int) Math.round(baseScaledTileSize * CHARACTER_SCALE_BOOST));
     }
 
     public int scaleUniform(int value) {
@@ -1044,6 +1216,20 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawMapNameGUI(Graphics2D g2) {
+        if (mapTitleImage != null) {
+            int maxWidth = Math.max(1, getWidth() / 4);
+            int maxHeight = Math.max(1, getHeight() / 8);
+            int imageWidth = mapTitleImage.getWidth();
+            int imageHeight = mapTitleImage.getHeight();
+            double scale = Math.min((double) maxWidth / imageWidth, (double) maxHeight / imageHeight);
+            int drawWidth = Math.max(1, (int) Math.round(imageWidth * scale));
+            int drawHeight = Math.max(1, (int) Math.round(imageHeight * scale));
+            int bx = (getWidth() - drawWidth) / 2;
+            int by = scaleUniform(8);
+            g2.drawImage(mapTitleImage, bx, by, drawWidth, drawHeight, null);
+            return;
+        }
+
         String label = currentMapName.toUpperCase();
         int fontSize = scaleUniform(24);
         g2.setFont(new Font("Arial", Font.BOLD, fontSize));
@@ -1051,7 +1237,7 @@ public class GamePanel extends JPanel implements Runnable {
         int padding = scaleUniform(12);
         int boxWidth = textWidth + padding * 2;
         int boxHeight = fontSize + padding;
-        int bx = padding;
+        int bx = (getWidth() - boxWidth) / 2;
         int by = padding;
 
         g2.setColor(new Color(0, 0, 0, 180));
