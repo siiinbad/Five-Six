@@ -4,6 +4,7 @@ import entity.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.Objects;
@@ -70,6 +71,24 @@ public class GamePanel extends JPanel implements Runnable {
     public final int COLOR_CHAR_JOHNFIEL = 0x0EFC7B;
     private static final int COLOR_CHAR_PREVIEW = 0x078F00;
 
+    /** Battle UI regions on {@code battle_hitbox.png} (see design doc). */
+    private static final int COLOR_BATTLE_ITEMS      = 0xFEA800;
+    private static final int COLOR_BATTLE_ABILITIES  = 0xA600FF;
+    private static final int COLOR_BATTLE_PICK_ROCK  = 0xA4A29E;
+    private static final int COLOR_BATTLE_PICK_PAPER = 0x77FF88;
+    private static final int COLOR_BATTLE_PICK_SCISSORS = 0xC00000;
+    /** In-battle continue / advance (distinct from main-menu continue). */
+    private static final int COLOR_BATTLE_CONTINUE_PINK = 0xFF00C7;
+    /** Sprite placement on {@code battle_sprite_hitbox.png}. */
+    private static final int COLOR_BATTLE_PLAYER_SLOT = 0x444757;
+    private static final int COLOR_BATTLE_ENEMY_SLOT  = 0x692323;
+    /** Main art panel on {@code outcome_hitbox.png} (muted rectangle behind outcome PNG). */
+    private static final int COLOR_OUTCOME_ART_PANEL = 0xBC9995;
+
+    /** Fallback battle controls when {@code battleButton} PNGs are absent (wood panel style). */
+    private static final Color BATTLE_BTN_WOOD_FILL   = new Color(210, 185, 145);
+    private static final Color BATTLE_BTN_WOOD_BORDER = new Color(92, 58, 32);
+
     // GAME STATES
     public int gameState;
     public final int titleState  = 0;
@@ -127,8 +146,33 @@ public class GamePanel extends JPanel implements Runnable {
     private boolean battleResolved   = false;
     private boolean waitingForNext   = false;
     private String enemyName         = "";
+    private BufferedImage battleSceneImage;
+    private BufferedImage battleHitboxImage;
+    private BufferedImage battleSpriteHitboxImage;
+    private BufferedImage battlePlayerImage;
+    private BufferedImage battleEnemyImage;
+    /** Set when battle sprites load — avoids scanning full PNG alpha every frame (was freezing the UI). */
+    private Rectangle battlePlayerOpaqueBounds;
+    private Rectangle battleEnemyOpaqueBounds;
 
-    // BATTLE BUTTONS
+    private BufferedImage battleItemIdle, battleItemHover;
+    private BufferedImage battleAbilityIdle, battleAbilityHover;
+    private BufferedImage battleRockIdle, battleRockHover;
+    private BufferedImage battlePaperIdle, battlePaperHover;
+    private BufferedImage battleScissorsIdle, battleScissorsHover;
+    private BufferedImage battleContinueIdle, battleContinueHover;
+
+    /** Full-screen outcome scene and layout hitbox ({@code gle_outcome.png}, {@code outcome_hitbox.png}). */
+    private BufferedImage outcomeSceneImage;
+    private BufferedImage outcomeHitboxImage;
+    /** Win/lose illustration from {@code battleOutcomes/}; cleared when a new battle starts. */
+    private BufferedImage battleOutcomeArtImage;
+
+    private String battleHoverZone = "";
+
+    // BATTLE BUTTONS (screen-space; from colored regions on battle_hitbox, or fallback layout)
+    private Rectangle itemsBattleBtn = new Rectangle(0, 0, 0, 0);
+    private Rectangle abilitiesBattleBtn = new Rectangle(0, 0, 0, 0);
     private Rectangle rockBtn, paperBtn, scissorsBtn, continueBtn;
 
     // RNG
@@ -202,19 +246,8 @@ public class GamePanel extends JPanel implements Runnable {
                     }
                 }
 
-                if (gameState == fadeState && fadeAlpha >= 1f && !fadingIn) {
-                    gameState = battleState;
-                    startBattle();
-                }
-
                 if (gameState == battleState) {
-                    if (!waitingForNext) {
-                        if      (rockBtn.contains(p))     resolveBattle(BattleSystem.Move.ROCK);
-                        else if (paperBtn.contains(p))    resolveBattle(BattleSystem.Move.PAPER);
-                        else if (scissorsBtn.contains(p)) resolveBattle(BattleSystem.Move.SCISSORS);
-                    } else {
-                        if (continueBtn.contains(p)) nextRound();
-                    }
+                    handleBattleClick(p);
                 }
             }
         });
@@ -224,6 +257,14 @@ public class GamePanel extends JPanel implements Runnable {
             public void mouseMoved(MouseEvent e) {
                 if (menuFadeActive) return;
                 Point p = e.getPoint();
+                if (gameState == battleState) {
+                    String z = battleHoverZoneFromPoint(p);
+                    if (!z.equals(battleHoverZone)) {
+                        battleHoverZone = z;
+                        repaint();
+                    }
+                    return;
+                }
                 String prevButton = hoveredMenuButton;
                 int prevChar = hoveredCharIndex;
                 if (gameState == titleState) {
@@ -246,14 +287,208 @@ public class GamePanel extends JPanel implements Runnable {
         });
     }
 
+    /**
+     * Screen-space layout: top row Items | Abilities, bottom row Rock | Paper | Scissors,
+     * centered cluster (~reference layout). Overwritten by {@code battle_hitbox.png} regions when present.
+     */
+    private void layoutFallbackBattleButtons() {
+        int w = getWidth();
+        int h = getHeight();
+        int midX = w / 2;
+        int bh = Math.max(44, Math.min(68, h / 13));
+        int padBottom = Math.max(18, h / 26);
+        int rowGap = Math.max(8, h / 80);
+        int hGap = Math.max(8, w / 100);
+        int btnY = h - padBottom - bh;
+        int topY = btnY - bh - rowGap;
+
+        int maxCluster = Math.min(640, w - 40);
+        int bottomW = (maxCluster - 2 * hGap) / 3;
+        int topW = Math.min((maxCluster - hGap) / 2, Math.max(48, (int) (bottomW * 0.90)));
+        int bottomCluster = 3 * bottomW + 2 * hGap;
+        int topCluster = 2 * topW + hGap;
+
+        int bottomStart = midX - bottomCluster / 2;
+        int topStart = midX - topCluster / 2;
+
+        itemsBattleBtn = new Rectangle(topStart, topY, topW, bh);
+        abilitiesBattleBtn = new Rectangle(topStart + topW + hGap, topY, topW, bh);
+        rockBtn = new Rectangle(bottomStart, btnY, bottomW, bh);
+        paperBtn = new Rectangle(bottomStart + bottomW + hGap, btnY, bottomW, bh);
+        scissorsBtn = new Rectangle(bottomStart + 2 * (bottomW + hGap), btnY, bottomW, bh);
+    }
+
     private void updateBattleButtons() {
-        int bw   = 180, bh = 65;
+        if (getWidth() <= 0 || getHeight() <= 0) {
+            return;
+        }
+
+        layoutFallbackBattleButtons();
+
         int midX = getWidth() / 2;
-        int btnY = getHeight() - 160;
-        rockBtn     = new Rectangle(midX - 290, btnY, bw, bh);
-        paperBtn    = new Rectangle(midX - 90,  btnY, bw, bh);
-        scissorsBtn = new Rectangle(midX + 110, btnY, bw, bh);
-        continueBtn = new Rectangle(midX - 100, btnY, 200, bh);
+        int bh = Math.max(44, Math.min(68, getHeight() / 13));
+        int padBottom = Math.max(18, getHeight() / 26);
+        int btnY = getHeight() - padBottom - bh;
+
+        if (waitingForNext && outcomeHitboxImage != null) {
+            Rectangle contR = getColorBounds(outcomeHitboxImage, COLOR_BATTLE_CONTINUE_PINK);
+            continueBtn = contR != null ? contR : new Rectangle(midX - 100, btnY, 200, bh);
+            return;
+        }
+
+        if (battleHitboxImage != null) {
+            Rectangle itemsR = getColorBounds(battleHitboxImage, COLOR_BATTLE_ITEMS);
+            Rectangle abilR = getColorBounds(battleHitboxImage, COLOR_BATTLE_ABILITIES);
+            Rectangle rockR = getColorBounds(battleHitboxImage, COLOR_BATTLE_PICK_ROCK);
+            Rectangle paperR = getColorBounds(battleHitboxImage, COLOR_BATTLE_PICK_PAPER);
+            Rectangle sciR = getColorBounds(battleHitboxImage, COLOR_BATTLE_PICK_SCISSORS);
+            Rectangle contR = getColorBounds(battleHitboxImage, COLOR_BATTLE_CONTINUE_PINK);
+
+            // getColorBounds() already maps hitbox image → panel pixels; do not map twice.
+            if (itemsR != null) {
+                itemsBattleBtn = itemsR;
+            }
+            if (abilR != null) {
+                abilitiesBattleBtn = abilR;
+            }
+            if (rockR != null) {
+                rockBtn = rockR;
+            }
+            if (paperR != null) {
+                paperBtn = paperR;
+            }
+            if (sciR != null) {
+                scissorsBtn = sciR;
+            }
+
+            boolean haveRps = rockR != null && paperR != null && sciR != null;
+            if (!haveRps) {
+                Rectangle[] blob = detectBattleButtonBlobsImageSpace();
+                if (blob != null && blob.length >= 5) {
+                    java.util.Arrays.sort(blob, (a, b) -> {
+                        int rowA = a.y / 20;
+                        int rowB = b.y / 20;
+                        if (rowA != rowB) return Integer.compare(rowA, rowB);
+                        return Integer.compare(a.x, b.x);
+                    });
+                    itemsBattleBtn = mapHitboxImageRectToScreen(blob[0], battleHitboxImage);
+                    abilitiesBattleBtn = mapHitboxImageRectToScreen(blob[1], battleHitboxImage);
+                    rockBtn = mapHitboxImageRectToScreen(blob[2], battleHitboxImage);
+                    paperBtn = mapHitboxImageRectToScreen(blob[3], battleHitboxImage);
+                    scissorsBtn = mapHitboxImageRectToScreen(blob[4], battleHitboxImage);
+                }
+            }
+
+            if (waitingForNext) {
+                continueBtn = contR != null
+                        ? contR
+                        : new Rectangle(midX - 100, btnY, 200, bh);
+            } else {
+                continueBtn = new Rectangle(0, 0, 0, 0);
+            }
+            return;
+        }
+
+        if (waitingForNext) {
+            continueBtn = new Rectangle(midX - 100, btnY, 200, bh);
+        } else {
+            continueBtn = new Rectangle(0, 0, 0, 0);
+        }
+    }
+
+    private Rectangle mapHitboxImageRectToScreen(Rectangle imageRect, BufferedImage reference) {
+        int x = imageRect.x * getWidth() / Math.max(1, reference.getWidth());
+        int y = imageRect.y * getHeight() / Math.max(1, reference.getHeight());
+        int w = Math.max(1, imageRect.width * getWidth() / Math.max(1, reference.getWidth()));
+        int h = Math.max(1, imageRect.height * getHeight() / Math.max(1, reference.getHeight()));
+        return new Rectangle(x, y, w, h);
+    }
+
+    private void handleBattleClick(Point p) {
+        if (waitingForNext) {
+            if (outcomeHitboxImage != null) {
+                if (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p)) {
+                    nextRound();
+                }
+                return;
+            }
+            if (battleHitboxImage != null) {
+                int c = getMenuColorAt(p, battleHitboxImage);
+                if (c == COLOR_BATTLE_CONTINUE_PINK
+                        || (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p))) {
+                    nextRound();
+                }
+            } else if (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p)) {
+                nextRound();
+            }
+            return;
+        }
+
+        String zone = battlePickNearestButtonZone(p);
+        if ("rock".equals(zone)) {
+            resolveBattle(BattleSystem.Move.ROCK);
+        } else if ("paper".equals(zone)) {
+            resolveBattle(BattleSystem.Move.PAPER);
+        } else if ("scissors".equals(zone)) {
+            resolveBattle(BattleSystem.Move.SCISSORS);
+        }
+    }
+
+    /**
+     * Hit-test battle buttons using screen rectangles only. If several rects overlap (common when
+     * {@code battle_hitbox.png} regions are loose), pick the button whose center is closest to the cursor.
+     */
+    private String battlePickNearestButtonZone(Point p) {
+        String[] names = {"items", "abilities", "rock", "paper", "scissors"};
+        Rectangle[] rects = {itemsBattleBtn, abilitiesBattleBtn, rockBtn, paperBtn, scissorsBtn};
+        java.util.ArrayList<Integer> hit = new java.util.ArrayList<>(5);
+        for (int i = 0; i < names.length; i++) {
+            Rectangle r = rects[i];
+            if (r != null && r.width > 0 && r.height > 0 && r.contains(p)) {
+                hit.add(i);
+            }
+        }
+        if (hit.isEmpty()) {
+            return "";
+        }
+        if (hit.size() == 1) {
+            return names[hit.get(0)];
+        }
+        int bestIdx = hit.get(0);
+        long bestD = battleDistSqToRectCenter(p, rects[bestIdx]);
+        for (int k = 1; k < hit.size(); k++) {
+            int i = hit.get(k);
+            long d = battleDistSqToRectCenter(p, rects[i]);
+            if (d < bestD) {
+                bestD = d;
+                bestIdx = i;
+            }
+        }
+        return names[bestIdx];
+    }
+
+    private static long battleDistSqToRectCenter(Point p, Rectangle r) {
+        int cx = r.x + r.width / 2;
+        int cy = r.y + r.height / 2;
+        long dx = p.x - cx;
+        long dy = p.y - cy;
+        return dx * dx + dy * dy;
+    }
+
+    private String battleHoverZoneFromPoint(Point p) {
+        if (waitingForNext) {
+            if (outcomeHitboxImage != null) {
+                if (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p)) return "continue";
+                return "";
+            }
+            if (battleHitboxImage != null) {
+                int c = getMenuColorAt(p, battleHitboxImage);
+                if (c == COLOR_BATTLE_CONTINUE_PINK) return "continue";
+            }
+            if (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p)) return "continue";
+            return "";
+        }
+        return battlePickNearestButtonZone(p);
     }
 
     private void loadImages() {
@@ -333,6 +568,9 @@ public class GamePanel extends JPanel implements Runnable {
             menuStartHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_start_hitbox.png");
             menuGuiHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_gui_hitbox.png");
             menuCharacterSelectHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_characterselect_hitbox.png");
+            battleHitboxImage = readOptionalImage("/res/sprites/menu/menuHitbox/battle_hitbox.png");
+            battleSpriteHitboxImage = readOptionalImage("/res/sprites/menu/menuHitbox/battle_sprite_hitbox.png");
+            loadBattleUiArt();
             refreshMenuIconColors();
         } catch (Exception e) {
             System.out.println("Image loading failed.");
@@ -690,6 +928,7 @@ public class GamePanel extends JPanel implements Runnable {
         battleResolved = false;
         waitingForNext = false;
         enemyName = "";
+        battleOutcomeArtImage = null;
         loadImages();
 
     }
@@ -709,11 +948,11 @@ public class GamePanel extends JPanel implements Runnable {
         }
     }
 
+    /** Starts battle immediately (no fade / no intermediate screen). */
     public void startFadeToBlack() {
-        gameState     = fadeState;
-        fadeAlpha     = 0f;
-        fadingIn      = true;
         currentDialog = "";
+        gameState = battleState;
+        startBattle();
     }
 
     private void startMenuFade(int targetState) {
@@ -755,7 +994,9 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void startBattle() {
-        updateBattleButtons();
+        battleHoverZone = "";
+        loadBattleUiArt();
+        loadBattleAssets();
         enemyMaxHP        = enemyStats.getEnemyHP(pendingBattleEnemyColor);
         enemyCurrentHP    = enemyMaxHP;
         battleRound       = 1;
@@ -763,6 +1004,7 @@ public class GamePanel extends JPanel implements Runnable {
         enemyMoveDisplay  = "";
         battleResolved    = false;
         waitingForNext    = false;
+        battleOutcomeArtImage = null;
         enemyName         = getEnemyName(pendingBattleEnemyColor);
         battleMessage     = "Round " + battleRound + " - Choose your move!";
     }
@@ -774,6 +1016,189 @@ public class GamePanel extends JPanel implements Runnable {
         if (color == COLOR_JOHNRU)      return "Johnru";
         if (color == COLOR_ADRIAN)      return "Adrian";
         return "Enemy";
+    }
+
+    private BufferedImage readFirstExisting(String... paths) {
+        for (String path : paths) {
+            BufferedImage img = readOptionalImage(path);
+            if (img != null) return img;
+        }
+        return null;
+    }
+
+    private void loadBattleUiArt() {
+        String base = "/res/sprites/menu/battleButton/";
+        battleItemIdle = readFirstExisting(base + "items_idle.png", base + "item_idle.png");
+        battleItemHover = readFirstExisting(base + "items_hover.png", base + "item_hover.png");
+        battleAbilityIdle = readFirstExisting(base + "abilities_idle.png", base + "ability_idle.png");
+        battleAbilityHover = readFirstExisting(base + "abilities_hover.png", base + "ability_hovers.png", base + "ability_hover.png");
+        battleRockIdle = readFirstExisting(base + "rock_idle.png");
+        battleRockHover = readFirstExisting(base + "rock_hover.png");
+        battlePaperIdle = readFirstExisting(base + "paper_idle.png");
+        battlePaperHover = readFirstExisting(base + "paper_hover.png");
+        battleScissorsIdle = readFirstExisting(base + "scissors_idle.png");
+        battleScissorsHover = readFirstExisting(base + "scissors_hover.png");
+        battleContinueIdle = readFirstExisting(base + "continue_idle.png");
+        battleContinueHover = readFirstExisting(base + "continue_hover.png");
+        if (battleContinueIdle == null) battleContinueIdle = continueIdleImage;
+        if (battleContinueHover == null) battleContinueHover = continueHoverImage;
+
+        outcomeHitboxImage = readOptionalImage("/res/sprites/menu/menuHitbox/outcome_hitbox.png");
+        outcomeSceneImage = readOptionalImage("/res/sprites/menu/battleScene/gle_outcome.png");
+    }
+
+    private String getEnemySpriteKey(int color) {
+        if (color == COLOR_JAMES) return "james";
+        if (color == COLOR_ALIEYANDREW) return "alieyandrew";
+        if (color == COLOR_KYLE) return "kyle";
+        if (color == COLOR_JOHNRU) return "johnru";
+        if (color == COLOR_ADRIAN) return "adrian";
+        return "";
+    }
+
+    private void loadBattleAssets() {
+        String mapBattlePath = "/res/sprites/menu/battleScene/" + currentMapName + "_battle.png";
+        battleSceneImage = readOptionalImage(mapBattlePath);
+        if (battleSceneImage == null) {
+            battleSceneImage = readOptionalImage("/res/sprites/menu/battleScene/" + currentMapName + "_outcome.png");
+        }
+
+        String playerKey = CharacterStats.CharacterType.fromName(player.characterName).name().toLowerCase();
+        battlePlayerImage = readFirstExisting(
+                "/res/sprites/player/" + playerKey + "/" + playerKey + "_battle.png",
+                "/res/sprites/player/" + player.characterName + "/" + player.characterName + "_battle.png");
+
+        String enemyKey = getEnemySpriteKey(pendingBattleEnemyColor);
+        if (!enemyKey.isEmpty()) {
+            battleEnemyImage = readOptionalImage("/res/sprites/enemies/" + enemyKey + "/" + enemyKey + "_battle.png");
+        } else {
+            battleEnemyImage = null;
+        }
+
+        battlePlayerOpaqueBounds = battlePlayerImage != null ? getNonTransparentBounds(battlePlayerImage) : null;
+        battleEnemyOpaqueBounds = battleEnemyImage != null ? getNonTransparentBounds(battleEnemyImage) : null;
+    }
+
+    private static String battleMoveFileTag(BattleSystem.Move move) {
+        return switch (move) {
+            case ROCK -> "rock";
+            case PAPER -> "paper";
+            case SCISSORS -> "scissors";
+        };
+    }
+
+    /**
+     * PNGs in {@code /res/sprites/menu/battleOutcomes/}: primary {@code <your_move>_<enemy_move>.png}
+     * (e.g. {@code paper_paper.png}, {@code rock_scissors.png}). If missing and the battle just ended,
+     * falls back to character win/lose filenames ({@code win_<enemy>.png}, {@code lose_<player>.png}, …).
+     */
+    private void loadBattleOutcomeArt(BattleSystem.Move playerMove, BattleSystem.Move enemyMove) {
+        battleOutcomeArtImage = null;
+        String base = "/res/sprites/menu/battleOutcomes/";
+        battleOutcomeArtImage = readOptionalImage(
+                base + battleMoveFileTag(playerMove) + "_" + battleMoveFileTag(enemyMove) + ".png");
+        if (!battleResolved || battleOutcomeArtImage != null) {
+            return;
+        }
+
+        String playerKey = CharacterStats.CharacterType.fromName(player.characterName).name().toLowerCase();
+        String enemyKey = getEnemySpriteKey(pendingBattleEnemyColor);
+        boolean playerWon = enemyCurrentHP <= 0;
+
+        if (playerWon) {
+            if (!enemyKey.isEmpty()) {
+                battleOutcomeArtImage = readFirstExisting(
+                        base + "win_" + enemyKey + ".png",
+                        base + enemyKey + "_defeat.png",
+                        base + enemyKey + "_lose.png");
+            }
+            if (battleOutcomeArtImage == null) {
+                battleOutcomeArtImage = readFirstExisting(
+                        base + playerKey + "_win.png",
+                        base + "win_" + playerKey + ".png",
+                        base + "player_win.png");
+            }
+        } else {
+            battleOutcomeArtImage = readFirstExisting(
+                    base + "lose_" + playerKey + ".png",
+                    base + playerKey + "_lose.png",
+                    base + playerKey + "_defeat.png");
+            if (battleOutcomeArtImage == null && !enemyKey.isEmpty()) {
+                battleOutcomeArtImage = readFirstExisting(
+                        base + "win_" + enemyKey + ".png",
+                        base + enemyKey + "_win.png");
+            }
+            if (battleOutcomeArtImage == null) {
+                battleOutcomeArtImage = readOptionalImage(base + "player_lose.png");
+            }
+        }
+    }
+
+    /** Fallback when {@code battle_hitbox.png} uses one flat color per button (no distinct RGB ids). */
+    private Rectangle[] detectBattleButtonBlobsImageSpace() {
+        if (battleHitboxImage == null) return null;
+
+        int w = battleHitboxImage.getWidth();
+        int h = battleHitboxImage.getHeight();
+        boolean[][] visited = new boolean[h][w];
+        java.util.ArrayList<Rectangle> parts = new java.util.ArrayList<>();
+
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (visited[y][x] || !isBattleHitboxBlobPixel(x, y)) continue;
+
+                int minX = x, maxX = x, minY = y, maxY = y;
+                java.util.ArrayDeque<Point> queue = new java.util.ArrayDeque<>();
+                queue.add(new Point(x, y));
+                visited[y][x] = true;
+
+                while (!queue.isEmpty()) {
+                    Point p = queue.removeFirst();
+                    int px = p.x;
+                    int py = p.y;
+
+                    if (px < minX) minX = px;
+                    if (px > maxX) maxX = px;
+                    if (py < minY) minY = py;
+                    if (py > maxY) maxY = py;
+
+                    int[][] dirs = {{1,0}, {-1,0}, {0,1}, {0,-1}};
+                    for (int[] d : dirs) {
+                        int nx = px + d[0];
+                        int ny = py + d[1];
+                        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                        if (visited[ny][nx] || !isBattleHitboxBlobPixel(nx, ny)) continue;
+                        visited[ny][nx] = true;
+                        queue.add(new Point(nx, ny));
+                    }
+                }
+                parts.add(new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1));
+            }
+        }
+
+        if (parts.size() < 5) return null;
+
+        parts.sort((a, b) -> {
+            int rowA = a.y / 20;
+            int rowB = b.y / 20;
+            if (rowA != rowB) return Integer.compare(rowA, rowB);
+            return Integer.compare(a.x, b.x);
+        });
+
+        if (parts.size() > 5) {
+            parts = new java.util.ArrayList<>(parts.subList(0, 5));
+        }
+        return parts.toArray(new Rectangle[0]);
+    }
+
+    private boolean isBattleHitboxBlobPixel(int x, int y) {
+        int argb = battleHitboxImage.getRGB(x, y);
+        int alpha = (argb >>> 24) & 0xFF;
+        if (alpha == 0) return false;
+        int r = (argb >>> 16) & 0xFF;
+        int g = (argb >>> 8) & 0xFF;
+        int b = argb & 0xFF;
+        return !(r > 245 && g > 245 && b > 245);
     }
 
     private void resolveBattle(BattleSystem.Move playerMove) {
@@ -813,6 +1238,7 @@ public class GamePanel extends JPanel implements Runnable {
                 waitingForNext = true;
             }
         }
+        loadBattleOutcomeArt(playerMove, enemyMove);
     }
 
     private void nextRound() {
@@ -820,12 +1246,14 @@ public class GamePanel extends JPanel implements Runnable {
             if (player.currentHP <= 0) {
                 player.respawnWithPenalty();
             }
+            battleHoverZone = "";
             gameState         = playState;
             currentDialog     = "";
             dialogStage       = 0;
             lastNPCColor      = 0;
             battleResolved    = false;
             waitingForNext    = false;
+            battleOutcomeArtImage = null;
             playerMoveDisplay = "";
             enemyMoveDisplay  = "";
         } else {
@@ -1184,6 +1612,10 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawHPBar(Graphics2D g2, int x, int y, int w, int h, int current, int max, String label) {
+        drawHPBar(g2, x, y, w, h, current, max, label, Color.WHITE);
+    }
+
+    private void drawHPBar(Graphics2D g2, int x, int y, int w, int h, int current, int max, String label, Color labelColor) {
         g2.setColor(new Color(0, 0, 0, 160));
         g2.fillRoundRect(x - 4, y - 4, w + 8, h + 24, 10, 10);
 
@@ -1197,7 +1629,7 @@ public class GamePanel extends JPanel implements Runnable {
         g2.setColor(barColor);
         g2.fillRoundRect(x, y + 16, (int)(w * ratio), h, 6, 6);
 
-        g2.setColor(Color.WHITE);
+        g2.setColor(labelColor);
         g2.setFont(new Font("Arial", Font.BOLD, 16));
         g2.drawString(label + "  " + current + " / " + max, x, y + 14);
     }
@@ -1276,52 +1708,133 @@ public class GamePanel extends JPanel implements Runnable {
         g2.setColor(Color.BLACK);
         g2.fillRect(0, 0, getWidth(), getHeight());
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+    }
 
-        if (fadeAlpha >= 1f && !fadingIn) {
-            int bw = 280, bh = 70;
-            int bx = getWidth() / 2 - bw / 2;
-            int by = getHeight() / 2 - bh / 2;
+    /** Background {@code gle_outcome.png}, outcome art in {@code COLOR_OUTCOME_ART_PANEL} region, continue on magenta. */
+    private void drawBattleOutcomeScreen(Graphics2D g2) {
+        if (outcomeSceneImage != null) {
+            g2.drawImage(outcomeSceneImage, 0, 0, getWidth(), getHeight(), null);
+        } else {
+            g2.setColor(new Color(15, 15, 35));
+            g2.fillRect(0, 0, getWidth(), getHeight());
+        }
 
-            g2.setColor(new Color(180, 30, 30));
-            g2.fillRoundRect(bx, by, bw, bh, 16, 16);
+        Rectangle panel = outcomeHitboxImage != null
+                ? getColorBounds(outcomeHitboxImage, COLOR_OUTCOME_ART_PANEL)
+                : null;
+
+        if (battleOutcomeArtImage != null) {
+            if (panel != null && panel.width > 0 && panel.height > 0) {
+                drawImageFitInRect(g2, battleOutcomeArtImage, panel, false, null);
+            } else {
+                int margin = scaleUniform(24);
+                int reserveBottom = Math.max(scaleUniform(120), continueBtn != null ? continueBtn.height + margin * 3 : scaleUniform(96));
+                Rectangle fallback = new Rectangle(
+                        margin,
+                        margin,
+                        Math.max(1, getWidth() - 2 * margin),
+                        Math.max(1, getHeight() - reserveBottom));
+                drawImageFitInRect(g2, battleOutcomeArtImage, fallback, false, null);
+            }
+        }
+
+        boolean contHover = "continue".equals(battleHoverZone);
+        BufferedImage ci = contHover && battleContinueHover != null ? battleContinueHover : battleContinueIdle;
+        if (ci != null && continueBtn != null && continueBtn.width > 0) {
+            drawImageFitInRect(g2, ci, continueBtn, false, null);
+        } else if (continueBtn != null && continueBtn.width > 0) {
+            String label = battleResolved ? "Back to Game" : "Continue";
+            g2.setColor(new Color(40, 120, 40));
+            g2.fillRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
+            g2.setColor(new Color(100, 255, 100));
+            g2.setStroke(new BasicStroke(2));
+            g2.drawRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
             g2.setColor(Color.WHITE);
-            g2.setStroke(new BasicStroke(3));
-            g2.drawRoundRect(bx, by, bw, bh, 16, 16);
-            g2.setFont(new Font("Arial", Font.BOLD, 34));
-            String label = "START BATTLE";
+            g2.setFont(new Font("Arial", Font.BOLD, 24));
             int lw = g2.getFontMetrics().stringWidth(label);
-            g2.drawString(label, getWidth() / 2 - lw / 2, by + 46);
+            g2.drawString(label, continueBtn.x + continueBtn.width / 2 - lw / 2, continueBtn.y + 42);
+        }
+
+        if (!battleMessage.isEmpty()) {
+            int midX = getWidth() / 2;
+            g2.setFont(new Font("Arial", Font.BOLD, Math.min(28, scaleUniform(24))));
+            FontMetrics fm = g2.getFontMetrics();
+            int lineGap = scaleUniform(8);
+            int padBelowBtn = scaleUniform(16);
+            String[] lines = battleMessage.split("\n");
+
+            int msgStartY;
+            if (continueBtn != null && continueBtn.width > 0 && continueBtn.height > 0) {
+                msgStartY = continueBtn.y + continueBtn.height + padBelowBtn + fm.getAscent();
+            } else {
+                msgStartY = panel != null && panel.height > 0
+                        ? panel.y + panel.height + scaleUniform(28)
+                        : getHeight() / 2 + scaleUniform(40);
+            }
+
+            int msgY = msgStartY;
+            for (String line : lines) {
+                int lw = fm.stringWidth(line);
+                g2.setColor(new Color(255, 230, 100));
+                g2.drawString(line, midX - lw / 2, msgY);
+                msgY += fm.getHeight() + lineGap;
+            }
         }
     }
 
     private void drawBattleState(Graphics2D g2) {
         updateBattleButtons();
 
-        g2.setColor(new Color(15, 15, 35));
-        g2.fillRect(0, 0, getWidth(), getHeight());
+        if (waitingForNext && outcomeHitboxImage != null) {
+            drawBattleOutcomeScreen(g2);
+            return;
+        }
+
+        if (battleSceneImage != null) {
+            g2.drawImage(battleSceneImage, 0, 0, getWidth(), getHeight(), null);
+        } else {
+            g2.setColor(new Color(15, 15, 35));
+            g2.fillRect(0, 0, getWidth(), getHeight());
+        }
+
+        if (battleSpriteHitboxImage != null) {
+            // getColorBounds() returns panel-space rects (same as battle_hitbox.png handling).
+            Rectangle playerSlot = getColorBounds(battleSpriteHitboxImage, COLOR_BATTLE_PLAYER_SLOT);
+            Rectangle enemySlot = getColorBounds(battleSpriteHitboxImage, COLOR_BATTLE_ENEMY_SLOT);
+            if (playerSlot != null && playerSlot.width > 0) {
+                drawBattleSpriteStretched(g2, battlePlayerImage, playerSlot, false, battlePlayerOpaqueBounds);
+            }
+            if (enemySlot != null && enemySlot.width > 0) {
+                drawBattleSpriteStretched(g2, battleEnemyImage, enemySlot, false, battleEnemyOpaqueBounds);
+            }
+        } else {
+            int battleSpriteY = getHeight() / 2 - 30;
+            drawBattleCharacter(g2, battlePlayerImage, getWidth() / 4, battleSpriteY, false, battlePlayerOpaqueBounds);
+            drawBattleCharacter(g2, battleEnemyImage, getWidth() * 3 / 4, battleSpriteY, false, battleEnemyOpaqueBounds);
+        }
 
         int midX = getWidth() / 2;
 
+        int hpY = Math.max(8, scaleUniform(8));
+        int barW = Math.min(400, (getWidth() - 96) / 2);
+        int leftX = 24;
+        int rightX = getWidth() - 24 - barW;
+        drawHPBar(g2, leftX, hpY, barW, 22, player.currentHP, player.maxHP, player.characterName, Color.WHITE);
+        drawHPBar(g2, rightX, hpY, barW, 22, enemyCurrentHP, enemyMaxHP, enemyName, new Color(255, 120, 120));
+
+        int titleY = hpY + 52;
         g2.setColor(new Color(220, 60, 60));
-        g2.setFont(new Font("Arial", Font.BOLD, 40));
+        g2.setFont(new Font("Arial", Font.BOLD, 34));
         String battleTitle = "BATTLE - Round " + battleRound;
         int tw = g2.getFontMetrics().stringWidth(battleTitle);
-        g2.drawString(battleTitle, midX - tw / 2, 70);
-
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("Arial", Font.BOLD, 22));
-        g2.drawString(player.characterName, 80, 130);
-        drawHPBar(g2, 80, 140, 340, 28, player.currentHP, player.maxHP, "");
-
-        int eHPx = getWidth() - 460;
-        g2.setColor(new Color(255, 120, 120));
-        g2.setFont(new Font("Arial", Font.BOLD, 22));
-        g2.drawString(enemyName, eHPx, 130);
-        drawHPBar(g2, eHPx, 140, 340, 28, enemyCurrentHP, enemyMaxHP, "");
+        g2.drawString(battleTitle, midX - tw / 2, titleY);
 
         g2.setColor(new Color(255, 200, 50));
-        g2.setFont(new Font("Arial", Font.BOLD, 46));
-        g2.drawString("VS", midX - 24, 170);
+        g2.setFont(new Font("Arial", Font.BOLD, 40));
+        FontMetrics vsFm = g2.getFontMetrics();
+        g2.drawString("VS", midX - vsFm.stringWidth("VS") / 2, titleY + 44);
+
+        int eHPx = rightX;
 
         if (!playerMoveDisplay.isEmpty()) {
             int boxY = 250, boxH = 100, boxW = 260;
@@ -1355,20 +1868,99 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         if (!waitingForNext) {
-            drawMoveButton(g2, rockBtn,     "ROCK",     new Color(100, 80,  40),  new Color(200, 160, 80));
-            drawMoveButton(g2, paperBtn,    "PAPER",    new Color(40,  80,  120), new Color(80,  160, 220));
-            drawMoveButton(g2, scissorsBtn, "SCISSORS", new Color(80,  40,  100), new Color(180, 80,  220));
+            drawBattleWoodButton(g2, itemsBattleBtn, battleItemIdle, battleItemHover, "Items", "items".equals(battleHoverZone));
+            drawBattleWoodButton(g2, abilitiesBattleBtn, battleAbilityIdle, battleAbilityHover, "Abilities", "abilities".equals(battleHoverZone));
+            drawStretchedPickArt(g2, rockBtn, battleRockIdle, battleRockHover, "Rock", "rock".equals(battleHoverZone));
+            drawStretchedPickArt(g2, paperBtn, battlePaperIdle, battlePaperHover, "Paper", "paper".equals(battleHoverZone));
+            drawStretchedPickArt(g2, scissorsBtn, battleScissorsIdle, battleScissorsHover, "Scissors", "scissors".equals(battleHoverZone));
         } else {
-            String label = battleResolved ? "Back to Game" : "Next Round";
-            g2.setColor(new Color(40, 120, 40));
-            g2.fillRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
-            g2.setColor(new Color(100, 255, 100));
-            g2.setStroke(new BasicStroke(2));
-            g2.drawRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
-            g2.setColor(Color.WHITE);
-            g2.setFont(new Font("Arial", Font.BOLD, 24));
-            int lw = g2.getFontMetrics().stringWidth(label);
-            g2.drawString(label, continueBtn.x + continueBtn.width / 2 - lw / 2, continueBtn.y + 42);
+            boolean contHover = "continue".equals(battleHoverZone);
+            BufferedImage ci = contHover && battleContinueHover != null ? battleContinueHover : battleContinueIdle;
+            if (ci != null && continueBtn.width > 0) {
+                drawImageFitInRect(g2, ci, continueBtn, false, null);
+            } else if (continueBtn.width > 0) {
+                String label = battleResolved ? "Back to Game" : "Next Round";
+                g2.setColor(new Color(40, 120, 40));
+                g2.fillRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
+                g2.setColor(new Color(100, 255, 100));
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 24));
+                int lw = g2.getFontMetrics().stringWidth(label);
+                g2.drawString(label, continueBtn.x + continueBtn.width / 2 - lw / 2, continueBtn.y + 42);
+            }
+        }
+    }
+
+    /**
+     * Draws {@code img} inside {@code dest} preserving aspect ratio (letterboxed), centered.
+     * Optional {@code srcCrop} limits the source to a sub-rectangle (e.g. non-transparent bounds).
+     */
+    private void drawImageFitInRect(Graphics2D g2, BufferedImage img, Rectangle dest, boolean flipHorizontal,
+                                    Rectangle srcCrop) {
+        if (img == null || dest == null || dest.width <= 0 || dest.height <= 0) return;
+
+        int sx0 = 0;
+        int sy0 = 0;
+        int sw = img.getWidth();
+        int sh = img.getHeight();
+        if (srcCrop != null && srcCrop.width > 0 && srcCrop.height > 0) {
+            sx0 = srcCrop.x;
+            sy0 = srcCrop.y;
+            sw = srcCrop.width;
+            sh = srcCrop.height;
+        }
+        if (sw <= 0 || sh <= 0) return;
+
+        double scale = Math.min((double) dest.width / sw, (double) dest.height / sh);
+        int dw = Math.max(1, (int) Math.round(sw * scale));
+        int dh = Math.max(1, (int) Math.round(sh * scale));
+        int dx = dest.x + (dest.width - dw) / 2;
+        int dy = dest.y + (dest.height - dh) / 2;
+
+        Object prevInterp = g2.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        try {
+            if (!flipHorizontal) {
+                g2.drawImage(img, dx, dy, dx + dw, dy + dh, sx0, sy0, sx0 + sw, sy0 + sh, null);
+            } else {
+                AffineTransform old = g2.getTransform();
+                g2.translate(dx + dw, dy);
+                g2.scale(-1, 1);
+                g2.drawImage(img, 0, 0, dw, dh, sx0, sy0, sx0 + sw, sy0 + sh, null);
+                g2.setTransform(old);
+            }
+        } finally {
+            // getRenderingHint can return null; setRenderingHint(..., null) throws IllegalArgumentException.
+            if (prevInterp != null) {
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, prevInterp);
+            } else {
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            }
+        }
+    }
+
+    /** Optional PNG from {@code battleButton/}; otherwise draws the wood-style label on the battle scene. */
+    private void drawBattleWoodButton(Graphics2D g2, Rectangle rect, BufferedImage idle, BufferedImage hover,
+                                      String label, boolean hovered) {
+        if (rect == null || rect.width <= 0) return;
+        BufferedImage img = hovered && hover != null ? hover : idle;
+        if (img != null) {
+            drawImageFitInRect(g2, img, rect, false, null);
+        } else {
+            drawMoveButton(g2, rect, label, BATTLE_BTN_WOOD_FILL, BATTLE_BTN_WOOD_BORDER);
+        }
+    }
+
+    private void drawStretchedPickArt(Graphics2D g2, Rectangle rect, BufferedImage idle, BufferedImage hover,
+                                     String fallbackLabel, boolean hovered) {
+        if (rect == null || rect.width <= 0) return;
+        BufferedImage img = hovered && hover != null ? hover : idle;
+        if (img != null) {
+            drawImageFitInRect(g2, img, rect, false, null);
+        } else {
+            drawMoveButton(g2, rect, fallbackLabel, BATTLE_BTN_WOOD_FILL, BATTLE_BTN_WOOD_BORDER);
         }
     }
 
@@ -1378,9 +1970,56 @@ public class GamePanel extends JPanel implements Runnable {
         g2.setColor(border);
         g2.setStroke(new BasicStroke(2));
         g2.drawRoundRect(btn.x, btn.y, btn.width, btn.height, 14, 14);
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("Arial", Font.BOLD, 26));
-        int lw = g2.getFontMetrics().stringWidth(label);
-        g2.drawString(label, btn.x + btn.width / 2 - lw / 2, btn.y + 44);
+        g2.setColor(new Color(60, 42, 22));
+
+        int fontSize = Math.min(26, Math.max(14, btn.height / 2));
+        Font font = new Font("Arial", Font.BOLD, fontSize);
+        g2.setFont(font);
+        FontMetrics fm = g2.getFontMetrics();
+        while (fontSize > 12 && fm.stringWidth(label) > btn.width - 10) {
+            fontSize--;
+            font = new Font("Arial", Font.BOLD, fontSize);
+            g2.setFont(font);
+            fm = g2.getFontMetrics();
+        }
+        int lw = fm.stringWidth(label);
+        int textY = btn.y + (btn.height + fm.getAscent() - fm.getDescent()) / 2;
+        g2.drawString(label, btn.x + btn.width / 2 - lw / 2, textY);
+    }
+
+    private void drawBattleSpriteStretched(Graphics2D g2, BufferedImage sprite, Rectangle slot, boolean flipHorizontal,
+                                          Rectangle cachedOpaqueBounds) {
+        if (sprite == null || slot == null || slot.width <= 0 || slot.height <= 0) return;
+        Rectangle crop = cachedOpaqueBounds != null ? cachedOpaqueBounds : getNonTransparentBounds(sprite);
+        drawImageFitInRect(g2, sprite, slot, flipHorizontal, crop);
+    }
+
+    private void drawBattleCharacter(Graphics2D g2, BufferedImage sprite, int anchorX, int baselineY, boolean flip,
+                                    Rectangle cachedOpaqueBounds) {
+        if (sprite == null) return;
+
+        Rectangle spriteBounds = cachedOpaqueBounds != null ? cachedOpaqueBounds : getNonTransparentBounds(sprite);
+        if (spriteBounds == null) return;
+
+        int targetH = Math.max(scaleUniform(190), getHeight() / 3);
+        int targetW = Math.max(1, (int) (targetH * ((double) spriteBounds.width / Math.max(1, spriteBounds.height))));
+        int drawX = anchorX - targetW / 2;
+        int drawY = baselineY - targetH;
+
+        if (!flip) {
+            g2.drawImage(
+                    sprite,
+                    drawX, drawY, drawX + targetW, drawY + targetH,
+                    spriteBounds.x, spriteBounds.y, spriteBounds.x + spriteBounds.width, spriteBounds.y + spriteBounds.height,
+                    null
+            );
+        } else {
+            g2.drawImage(
+                    sprite,
+                    drawX + targetW, drawY, drawX, drawY + targetH,
+                    spriteBounds.x, spriteBounds.y, spriteBounds.x + spriteBounds.width, spriteBounds.y + spriteBounds.height,
+                    null
+            );
+        }
     }
 }
