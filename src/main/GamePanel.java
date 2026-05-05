@@ -951,8 +951,10 @@ public class GamePanel extends JPanel implements Runnable {
     /** Starts battle immediately (no fade / no intermediate screen). */
     public void startFadeToBlack() {
         currentDialog = "";
-        gameState = battleState;
+        // Prepare sprites and HP before battleState so EDT repaint cannot paint battle UI with the
+        // previous enemy's stance (game loop is not the Swing EDT).
         startBattle();
+        gameState = battleState;
     }
 
     private void startMenuFade(int targetState) {
@@ -1057,6 +1059,11 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void loadBattleAssets() {
+        battlePlayerImage = null;
+        battleEnemyImage = null;
+        battlePlayerOpaqueBounds = null;
+        battleEnemyOpaqueBounds = null;
+
         String mapBattlePath = "/res/sprites/menu/battleScene/" + currentMapName + "_battle.png";
         battleSceneImage = readOptionalImage(mapBattlePath);
         if (battleSceneImage == null) {
