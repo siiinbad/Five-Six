@@ -6,10 +6,18 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.Random;
 import javax.imageio.ImageIO;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
@@ -118,6 +126,36 @@ public class GamePanel extends JPanel implements Runnable {
     private int menuSettingsColor = 0;
     private int hoverFrameCounter = 0;
     private int lastHoveredIndex = -1;
+    private static final String[] MENU_SOUNDTRACK_PATHS = {
+            "/res/soundTrack/menu_soundtract.mp3",
+            "/res/soundTrack/menu_sountrack.mp3",
+            "/res/soundTrack/menu_soundtract.wav",
+            "/res/soundTrack/menu_sountrack.wav"
+    };
+    private static final String[] GLE_SOUNDTRACK_PATHS = {
+            "/res/soundTrack/gle_soundtrack.mp3",
+            "/res/soundTrack/gle_soundtract.mp3",
+            "/res/soundTrack/gle_soundtrack.wav",
+            "/res/soundTrack/gle_soundtract.wav"
+    };
+    private static final String[] BATTLE_SOUNDTRACK_PATHS = {
+            "/res/soundTrack/battle_soundtrack.mp3",
+            "/res/soundTrack/battle_sountrack.mp3",
+            "/res/soundTrack/battle_soundtract.mp3",
+            "/res/soundTrack/battle_soundtrack.wav",
+            "/res/soundTrack/battle_sountrack.wav",
+            "/res/soundTrack/battle_soundtract.wav"
+    };
+    private String activeSoundtrackKey = "";
+    private String[] activeSoundtrackPaths = MENU_SOUNDTRACK_PATHS;
+    private Clip menuSoundtrackClip;
+    private Object menuSoundtrackFxPlayer;
+    private java.net.URL menuSoundtrackMp3Url;
+    private URLClassLoader jLayerClassLoader;
+    private Thread menuSoundtrackMp3Thread;
+    private volatile Object menuSoundtrackJLayerPlayer;
+    private volatile boolean menuSoundtrackMp3StopRequested = false;
+    private boolean menuSoundtrackMuted = false;
     private static final CharacterStats.CharacterType[] CHAR_TYPES = {
             CharacterStats.CharacterType.IVAN,
             CharacterStats.CharacterType.NIMUEL,
@@ -199,6 +237,7 @@ public class GamePanel extends JPanel implements Runnable {
         johnfielBtn = new Rectangle(334, 120, 81, 24);
 
         loadImages();
+        updateBackgroundSoundtrack();
 
         this.addMouseListener(new MouseAdapter() {
             @Override
@@ -208,6 +247,10 @@ public class GamePanel extends JPanel implements Runnable {
 
                 if (gameState == titleState) {
                     String button = getMainMenuButtonAt(p);
+                    if ("mute".equals(button)) {
+                        toggleMenuSoundtrackMute();
+                        return;
+                    }
                     if ("start".equals(button)) {
                         clearMenuHover();
                         startMenuFade(startMenuState);
@@ -220,6 +263,10 @@ public class GamePanel extends JPanel implements Runnable {
 
                 if (gameState == startMenuState) {
                     String button = getStartMenuButtonAt(p);
+                    if ("mute".equals(button)) {
+                        toggleMenuSoundtrackMute();
+                        return;
+                    }
                     if ("continue".equals(button) && player != null) {
                         clearMenuHover();
                         startMenuFade(playState);
@@ -237,7 +284,11 @@ public class GamePanel extends JPanel implements Runnable {
 
                 if (gameState == characterSelectState) {
                     String menuButton = getCharacterSelectButtonAt(p);
-                    if ("mute".equals(menuButton) || "settings".equals(menuButton)) {
+                    if ("mute".equals(menuButton)) {
+                        toggleMenuSoundtrackMute();
+                        return;
+                    }
+                    if ("settings".equals(menuButton)) {
                         return;
                     }
                     String selectedCharacter = getCharacterNameAt(p);
@@ -878,6 +929,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void quitGame() {
+        stopMenuSoundtrack();
         gameThread = null;
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window != null) {
@@ -983,6 +1035,326 @@ public class GamePanel extends JPanel implements Runnable {
                 menuFadeActive = false;
             }
         }
+    }
+
+    private void loadMenuSoundtrack() {
+        stopMenuSoundtrack();
+        menuSoundtrackMp3Url = null;
+        StringBuilder loadErrors = new StringBuilder();
+        for (String path : activeSoundtrackPaths) {
+            java.net.URL resource = resolveAudioUrl(path);
+            if (resource == null) {
+                loadErrors.append("Missing: ").append(path).append('\n');
+                continue;
+            }
+            if (tryLoadMenuSoundtrackWithClip(resource)) {
+                System.out.println("Loaded menu soundtrack via Clip: " + resource);
+                return;
+            }
+            if (tryLoadMenuSoundtrackWithJavaFx(resource)) {
+                System.out.println("Loaded menu soundtrack via JavaFX: " + resource);
+                return;
+            }
+            if (tryPrepareMenuSoundtrackWithJLayer(resource)) {
+                System.out.println("Loaded menu soundtrack via JLayer: " + resource);
+                return;
+            }
+            loadErrors.append("Unsupported/failed decode: ").append(resource).append('\n');
+        }
+        System.out.println("Menu soundtrack could not be loaded.");
+        if (loadErrors.length() > 0) {
+            System.out.println(loadErrors);
+        }
+        System.out.println("Tip: add soundtrack files under src/res/soundTrack/.");
+    }
+
+    private boolean tryPrepareMenuSoundtrackWithJLayer(java.net.URL resource) {
+        String lower = resource.toString().toLowerCase();
+        if (!lower.endsWith(".mp3")) return false;
+        if (!isJLayerAvailable()) return false;
+        menuSoundtrackMp3Url = resource;
+        return true;
+    }
+
+    private boolean isJLayerAvailable() {
+        try {
+            loadJLayerAdvancedPlayerClass();
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private URLClassLoader getJLayerClassLoader() {
+        if (jLayerClassLoader != null) return jLayerClassLoader;
+        try {
+            // If classes are already on classpath, no custom loader needed.
+            Class.forName("javazoom.jl.player.advanced.AdvancedPlayer");
+            return null;
+        } catch (ClassNotFoundException ignored) {
+        }
+        try {
+            File jar = new File("lib", "jl1.0.1.jar");
+            if (!jar.exists()) return null;
+            jLayerClassLoader = new URLClassLoader(
+                    new java.net.URL[]{jar.toURI().toURL()},
+                    getClass().getClassLoader()
+            );
+            Class.forName("javazoom.jl.player.advanced.AdvancedPlayer", true, jLayerClassLoader);
+            return jLayerClassLoader;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private Class<?> loadJLayerAdvancedPlayerClass() throws ClassNotFoundException {
+        URLClassLoader cl = getJLayerClassLoader();
+        if (cl == null) {
+            return Class.forName("javazoom.jl.player.advanced.AdvancedPlayer");
+        }
+        return Class.forName("javazoom.jl.player.advanced.AdvancedPlayer", true, cl);
+    }
+
+    private void startJLayerMenuSoundtrack() {
+        if (menuSoundtrackMp3Url == null || menuSoundtrackMp3Thread != null) return;
+        menuSoundtrackMp3StopRequested = false;
+        Thread t = new Thread(() -> {
+            try {
+                Class<?> playerClass = loadJLayerAdvancedPlayerClass();
+                java.lang.reflect.Constructor<?> constructor = playerClass.getConstructor(InputStream.class);
+                Method playMethod = playerClass.getMethod("play");
+                Method closeMethod = playerClass.getMethod("close");
+
+                while (!menuSoundtrackMp3StopRequested) {
+                    try (InputStream raw = menuSoundtrackMp3Url.openStream();
+                         BufferedInputStream buffered = new BufferedInputStream(raw)) {
+                        Object player = constructor.newInstance(buffered);
+                        menuSoundtrackJLayerPlayer = player;
+                        playMethod.invoke(player);
+                        menuSoundtrackJLayerPlayer = null;
+                        closeMethod.invoke(player);
+                    }
+                }
+            } catch (Exception e) {
+                if (!menuSoundtrackMp3StopRequested) {
+                    System.out.println("JLayer menu soundtrack error: " + e.getMessage());
+                }
+            } finally {
+                menuSoundtrackJLayerPlayer = null;
+                menuSoundtrackMp3Thread = null;
+            }
+        }, "menu-mp3-loop");
+        t.setDaemon(true);
+        menuSoundtrackMp3Thread = t;
+        t.start();
+    }
+
+    private void stopJLayerMenuSoundtrack() {
+        menuSoundtrackMp3StopRequested = true;
+        Object player = menuSoundtrackJLayerPlayer;
+        if (player != null) {
+            try {
+                Method closeMethod = player.getClass().getMethod("close");
+                closeMethod.invoke(player);
+            } catch (Exception ignored) {
+            }
+        }
+        Thread t = menuSoundtrackMp3Thread;
+        if (t != null) {
+            t.interrupt();
+        }
+    }
+
+    private java.net.URL resolveAudioUrl(String resourcePath) {
+        try {
+            java.net.URL classpathUrl = getClass().getResource(resourcePath);
+            if (classpathUrl != null) return classpathUrl;
+
+            String relative = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
+            File workspaceFile = new File("src", relative);
+            if (workspaceFile.exists()) return workspaceFile.toURI().toURL();
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private boolean tryLoadMenuSoundtrackWithClip(java.net.URL resource) {
+        try {
+            AudioInputStream stream = AudioSystem.getAudioInputStream(resource);
+            Clip clip = AudioSystem.getClip();
+            clip.open(stream);
+            stream.close();
+            menuSoundtrackClip = clip;
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean tryLoadMenuSoundtrackWithJavaFx(java.net.URL resource) {
+        try {
+            Class<?> jfxPanelClass = Class.forName("javafx.embed.swing.JFXPanel");
+            jfxPanelClass.getDeclaredConstructor().newInstance();
+            Class<?> mediaClass = Class.forName("javafx.scene.media.Media");
+            Class<?> mediaPlayerClass = Class.forName("javafx.scene.media.MediaPlayer");
+            Class<?> javafxApplicationClass = Class.forName("javafx.application.Platform");
+            Class<?> runnableClass = Class.forName("java.lang.Runnable");
+
+            Object media = mediaClass.getConstructor(String.class).newInstance(resource.toURI().toString());
+            Object player = mediaPlayerClass.getConstructor(mediaClass).newInstance(media);
+
+            Method runLaterMethod = javafxApplicationClass.getMethod("runLater", runnableClass);
+            Method setCycleCountMethod = mediaPlayerClass.getMethod("setCycleCount", int.class);
+            Method setMuteMethod = mediaPlayerClass.getMethod("setMute", boolean.class);
+            Method playMethod = mediaPlayerClass.getMethod("play");
+            int indefinite = mediaPlayerClass.getField("INDEFINITE").getInt(null);
+
+            runLaterMethod.invoke(null, (Runnable) () -> {
+                try {
+                    setCycleCountMethod.invoke(player, indefinite);
+                    setMuteMethod.invoke(player, menuSoundtrackMuted);
+                    playMethod.invoke(player);
+                } catch (Exception ignored) {
+                }
+            });
+            menuSoundtrackFxPlayer = player;
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void runOnJavaFxThread(Runnable action) {
+        try {
+            Class<?> javafxApplicationClass = Class.forName("javafx.application.Platform");
+            Method runLaterMethod = javafxApplicationClass.getMethod("runLater", Runnable.class);
+            runLaterMethod.invoke(null, action);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void setJavaFxPlayerMute(boolean muted) {
+        if (menuSoundtrackFxPlayer == null) return;
+        runOnJavaFxThread(() -> {
+            try {
+                Method setMuteMethod = menuSoundtrackFxPlayer.getClass().getMethod("setMute", boolean.class);
+                setMuteMethod.invoke(menuSoundtrackFxPlayer, muted);
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    private void playJavaFxMenuSoundtrack() {
+        if (menuSoundtrackFxPlayer == null) return;
+        runOnJavaFxThread(() -> {
+            try {
+                Method playMethod = menuSoundtrackFxPlayer.getClass().getMethod("play");
+                playMethod.invoke(menuSoundtrackFxPlayer);
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    private void pauseJavaFxMenuSoundtrack() {
+        if (menuSoundtrackFxPlayer == null) return;
+        runOnJavaFxThread(() -> {
+            try {
+                Method pauseMethod = menuSoundtrackFxPlayer.getClass().getMethod("pause");
+                pauseMethod.invoke(menuSoundtrackFxPlayer);
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    private void disposeJavaFxMenuSoundtrack() {
+        if (menuSoundtrackFxPlayer == null) return;
+        Object player = menuSoundtrackFxPlayer;
+        menuSoundtrackFxPlayer = null;
+        runOnJavaFxThread(() -> {
+            try {
+                Method stopMethod = player.getClass().getMethod("stop");
+                Method disposeMethod = player.getClass().getMethod("dispose");
+                stopMethod.invoke(player);
+                disposeMethod.invoke(player);
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    private void stopMenuSoundtrack() {
+        stopJLayerMenuSoundtrack();
+        if (menuSoundtrackClip != null) {
+            menuSoundtrackClip.stop();
+            menuSoundtrackClip.close();
+            menuSoundtrackClip = null;
+        }
+        disposeJavaFxMenuSoundtrack();
+    }
+
+    private boolean isMenuState(int state) {
+        return state == titleState || state == startMenuState || state == characterSelectState;
+    }
+
+    private String getTargetSoundtrackKey() {
+        if (isMenuState(gameState) || (menuFadeActive && isMenuState(menuFadeTargetState))) {
+            return "menu";
+        }
+        if (gameState == battleState) {
+            return "battle";
+        }
+        if (gameState == playState && START_MAP.equals(currentMapName)) {
+            return "gle";
+        }
+        return "";
+    }
+
+    private String[] getSoundtrackPathsByKey(String key) {
+        if ("menu".equals(key)) return MENU_SOUNDTRACK_PATHS;
+        if ("battle".equals(key)) return BATTLE_SOUNDTRACK_PATHS;
+        if ("gle".equals(key)) return GLE_SOUNDTRACK_PATHS;
+        return null;
+    }
+
+    private void updateBackgroundSoundtrack() {
+        String targetKey = getTargetSoundtrackKey();
+        if (!targetKey.equals(activeSoundtrackKey)) {
+            activeSoundtrackKey = targetKey;
+            if (targetKey.isEmpty()) {
+                stopMenuSoundtrack();
+            } else {
+                String[] paths = getSoundtrackPathsByKey(targetKey);
+                if (paths != null) {
+                    activeSoundtrackPaths = paths;
+                    loadMenuSoundtrack();
+                }
+            }
+        }
+        updateMenuSoundtrackPlayback();
+    }
+
+    private void toggleMenuSoundtrackMute() {
+        menuSoundtrackMuted = !menuSoundtrackMuted;
+        updateMenuSoundtrackPlayback();
+    }
+
+    private void updateMenuSoundtrackPlayback() {
+        if (menuSoundtrackClip == null && menuSoundtrackFxPlayer == null && menuSoundtrackMp3Url == null) return;
+        if (menuSoundtrackMuted || activeSoundtrackKey.isEmpty()) {
+            if (menuSoundtrackClip != null) menuSoundtrackClip.stop();
+            pauseJavaFxMenuSoundtrack();
+            setJavaFxPlayerMute(true);
+            stopJLayerMenuSoundtrack();
+            return;
+        }
+        if (menuSoundtrackClip != null && !menuSoundtrackClip.isRunning()) {
+            if (menuSoundtrackClip.getFramePosition() >= menuSoundtrackClip.getFrameLength()) {
+                menuSoundtrackClip.setFramePosition(0);
+            }
+            menuSoundtrackClip.loop(Clip.LOOP_CONTINUOUSLY);
+        }
+        setJavaFxPlayerMute(false);
+        playJavaFxMenuSoundtrack();
+        startJLayerMenuSoundtrack();
     }
 
     private void updateFade() {
@@ -1302,6 +1674,7 @@ public class GamePanel extends JPanel implements Runnable {
                 }
                 if (!keyH.escPressed) escWasPressed = false;
                 updateMenuFade();
+                updateBackgroundSoundtrack();
                 repaint();
                 delta--;
             }
@@ -1961,7 +2334,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawStretchedPickArt(Graphics2D g2, Rectangle rect, BufferedImage idle, BufferedImage hover,
-                                     String fallbackLabel, boolean hovered) {
+                                      String fallbackLabel, boolean hovered) {
         if (rect == null || rect.width <= 0) return;
         BufferedImage img = hovered && hover != null ? hover : idle;
         if (img != null) {
@@ -1995,14 +2368,14 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawBattleSpriteStretched(Graphics2D g2, BufferedImage sprite, Rectangle slot, boolean flipHorizontal,
-                                          Rectangle cachedOpaqueBounds) {
+                                           Rectangle cachedOpaqueBounds) {
         if (sprite == null || slot == null || slot.width <= 0 || slot.height <= 0) return;
         Rectangle crop = cachedOpaqueBounds != null ? cachedOpaqueBounds : getNonTransparentBounds(sprite);
         drawImageFitInRect(g2, sprite, slot, flipHorizontal, crop);
     }
 
     private void drawBattleCharacter(Graphics2D g2, BufferedImage sprite, int anchorX, int baselineY, boolean flip,
-                                    Rectangle cachedOpaqueBounds) {
+                                     Rectangle cachedOpaqueBounds) {
         if (sprite == null) return;
 
         Rectangle spriteBounds = cachedOpaqueBounds != null ? cachedOpaqueBounds : getNonTransparentBounds(sprite);
