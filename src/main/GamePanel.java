@@ -1,25 +1,21 @@
 package main;
 
+import static main.HitboxColors.Map.*;
+import static main.HitboxColors.Ui.*;
+
 import entity.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
-import java.io.File;
 import java.io.InputStream;
-import java.lang.reflect.Method;
-import java.net.URLClassLoader;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.Random;
+import java.util.*;
+import java.util.List;
 import javax.imageio.ImageIO;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
+import javax.swing.ToolTipManager;
+import javax.sound.sampled.*;
 
 public class GamePanel extends JPanel implements Runnable {
 
@@ -27,7 +23,6 @@ public class GamePanel extends JPanel implements Runnable {
     final int originalTileSize = 16;
     final int scale = 10;
     public final int tileSize = originalTileSize * scale;
-    private static final double CHARACTER_SCALE_BOOST = 1.25;
     public int screenWidth  = tileSize * 16;
     public int screenHeight = tileSize * 12;
 
@@ -35,964 +30,625 @@ public class GamePanel extends JPanel implements Runnable {
     public KeyHandler keyH = new KeyHandler(this);
     Thread gameThread;
     public Player player;
-    public BufferedImage mapImage, hitboxImage, mapTitleImage;
-    public BufferedImage menuBackgroundImage, menuLogoImage;
-    public BufferedImage startIdleImage, startHoverImage;
-    public BufferedImage creditsIdleImage, creditsHoverImage;
-    public BufferedImage quitIdleImage, quitHoverImage;
-    public BufferedImage continueIdleImage, continueHoverImage;
-    public BufferedImage selectCharacterIdleImage, selectCharacterHoverImage;
-    public BufferedImage muteIdleImage, muteHoverImage;
-    public BufferedImage settingsIdleImage, settingsHoverImage;
-    public BufferedImage[] characterButtonIdleImages, characterButtonHoverImages;
-    public BufferedImage[] characterSelectImages;
-    public BufferedImage menuStartHitboxImage, menuGuiHitboxImage, menuCharacterSelectHitboxImage;
+
+    // MAP
+    public BufferedImage mapImage;
+    public BufferedImage hitboxImage;       // NPC + wall + spawn colors
     public String currentMapName = "gle";
-    public static final String START_MAP = "gle";
-    public static final String WALKWAY_MAP = "walkWay";
-
-    // NPC IMAGES
-    public BufferedImage jamesStand, alieyandrewStand, kyleStand, johnruStand, adrianStand;
-
-    // PLAYER CHARACTER IMAGES
-    public BufferedImage[] ivanStands, nimuelStands, samStands, johnfielStands;
-
-    // COLOR CONSTANTS
-    public final int COLOR_WALL        = 0xA349A4;
-    public final int COLOR_DOOR        = 0xFF7F27;
-    public final int COLOR_SPAWN       = 0x22B14C;
-    public final int COLOR_JAMES       = 0x3F48CC;
-    public final int COLOR_ALIEYANDREW = 0xFFA1F2;
-    public final int COLOR_KYLE        = 0x00A2E8;
-    public final int COLOR_JOHNRU      = 0xFFF200;
-    public final int COLOR_ADRIAN      = 0xB97A57;
-    public final int COLORNEXTAREA     = 0xED1C24;
-    public final int COLOR_MENU_START  = 0x51FFD5;
-    public final int COLOR_MENU_CREDIT = 0x00FF7D;
-    public final int COLOR_MENU_QUIT   = 0x0DA100;
-    public final int COLOR_MENU_LOGO   = 0xBA8D7D;
-    public final int COLOR_CONTINUE    = 0xCE74FF;
-    public final int COLOR_SELECT_CHAR = 0x47B2FF;
-    public final int COLOR_CHAR_IVAN   = 0xFF0000;
-    public final int COLOR_CHAR_SAM    = 0xFFE679;
-    public final int COLOR_CHAR_NIMUEL = 0xFFADAD;
-    public final int COLOR_CHAR_JOHNFIEL = 0x0EFC7B;
-    private static final int COLOR_CHAR_PREVIEW = 0x078F00;
-
-    /** Battle UI regions on {@code battle_hitbox.png} (see design doc). */
-    private static final int COLOR_BATTLE_ITEMS      = 0xFEA800;
-    private static final int COLOR_BATTLE_ABILITIES  = 0xA600FF;
-    private static final int COLOR_BATTLE_PICK_ROCK  = 0xA4A29E;
-    private static final int COLOR_BATTLE_PICK_PAPER = 0x77FF88;
-    private static final int COLOR_BATTLE_PICK_SCISSORS = 0xC00000;
-    /** In-battle continue / advance (distinct from main-menu continue). */
-    private static final int COLOR_BATTLE_CONTINUE_PINK = 0xFF00C7;
-    /** Sprite placement on {@code battle_sprite_hitbox.png}. */
-    private static final int COLOR_BATTLE_PLAYER_SLOT = 0x444757;
-    private static final int COLOR_BATTLE_ENEMY_SLOT  = 0x692323;
-    /** Main art panel on {@code outcome_hitbox.png} (muted rectangle behind outcome PNG). */
-    private static final int COLOR_OUTCOME_ART_PANEL = 0xBC9995;
-
-    /** Fallback battle controls when {@code battleButton} PNGs are absent (wood panel style). */
-    private static final Color BATTLE_BTN_WOOD_FILL   = new Color(210, 185, 145);
-    private static final Color BATTLE_BTN_WOOD_BORDER = new Color(92, 58, 32);
+    public static final String GLE_MAP       = "gle";
+    public static final String FRONTGATE_MAP = "frontgate";
+    public static final String EMALL_MAP     = "emall";
 
     // GAME STATES
     public int gameState;
-    public final int titleState  = 0;
-    public final int playState   = 1;
-    public final int fadeState   = 2;
-    public final int battleState = 3;
-    public final int startMenuState = 4;
-    public final int characterSelectState = 5;
+    public static final int menuState      = 0;
+    public static final int menuStartState = 1;
+    public static final int menuCharState  = 2;
+    public static final int playState      = 3;
+    public static final int fadeState      = 4;
+    public static final int battleState    = 5;
+    public static final int outcomeState   = 6;
+    public static final int creditsState   = 7;
+    public static final int inventoryState = 8;
+    public static final int abilityState   = 9;
+    public static final int winState       = 10;
+
+    // HITBOX IMAGES (reused, small files kept in RAM)
+    private BufferedImage menuMainHitbox;
+    private BufferedImage menuStartHitbox;
+    private BufferedImage menuCharHitbox;
+    private BufferedImage battleHitbox;
+    private BufferedImage battleSpriteHitbox;
+    private BufferedImage worldGuiHitbox;
+    private BufferedImage outcomeHitbox;
+
+    // SCENE IMAGES (one loaded at a time)
+    private BufferedImage menuScreenImg;
+    private BufferedImage logoImg;
+    private BufferedImage mapTitleImg;
+    private BufferedImage battleSceneImg;
+    private BufferedImage outcomeSceneImg;
+    private BufferedImage outcomeRPSImg;
+
+    // BUTTON IMAGES  key -> [idle, hover]
+    private final Map<String, BufferedImage[]> btnImgs = new HashMap<>();
+
+    // NPC STAND IMAGES
+    private final Map<String, BufferedImage> npcStand = new HashMap<>();
+
+    // CHARACTER SELECT PREVIEW
+    private final Map<String, BufferedImage> charSelectImg = new HashMap<>();
+
+    // BATTLE SPRITES
+    private BufferedImage playerBattleImg;
+    private BufferedImage playerDialogImg;
+    private BufferedImage enemyBattleImg;
+    private BufferedImage enemyDialogImg;
+
+    // MOUSE
+    private Point mouse = new Point(0, 0);
+    private String hoveredBtn = null;
+    private int    hoveredCharColor = 0;
+
+    // SETTINGS / MUTE
+    public boolean settingsOpen = false;
+    public boolean isMuted      = false;
+    private String musicTrack   = "";
+    private Thread musicThread  = null;
+    private volatile boolean stopMusicRequested = false;
+    private volatile javazoom.jl.player.Player activeMusicPlayer = null;
+
+    // SAVE
+    private SaveData saveData = null;
+
+
+
+    private static final int AUTOSAVE_INTERVAL_FRAMES = 180;
 
     // DEBUG
-    public boolean showDebug = false;
-    private boolean f1WasPressed = false;
-    private boolean escWasPressed = false;
+    public boolean showDebug   = false;
+    private boolean f1WasHeld  = false;
+    private boolean escWasHeld = false;
 
     // DIALOG
     public String currentDialog = "";
-    public int dialogStage  = 0;
-    public int lastNPCColor = 0;
+    public int dialogStage      = 0;
+    public int lastNPCColor     = 0;
+    private int talkShake       = 0;
 
-    // TITLE SCREEN
-    Rectangle startBtn, creditsBtn, quitBtn, continueMenuBtn, selectCharacterBtn;
-    Rectangle muteBtn, settingsBtn, ivanBtn, samBtn, nimuelBtn, johnfielBtn;
-    private int hoveredCharIndex = -1;
-    private int hoveredMenuColor = 0;
-    private String hoveredMenuButton = "";
-    private int menuMuteColor = 0;
-    private int menuSettingsColor = 0;
-    private int hoverFrameCounter = 0;
-    private int lastHoveredIndex = -1;
-    private static final String[] MENU_SOUNDTRACK_PATHS = {
-            "/res/soundTrack/menu_soundtract.mp3",
-            "/res/soundTrack/menu_sountrack.mp3",
-            "/res/soundTrack/menu_soundtract.wav",
-            "/res/soundTrack/menu_sountrack.wav"
-    };
-    private static final String[] GLE_SOUNDTRACK_PATHS = {
-            "/res/soundTrack/gle_soundtrack.mp3",
-            "/res/soundTrack/gle_soundtract.mp3",
-            "/res/soundTrack/gle_soundtrack.wav",
-            "/res/soundTrack/gle_soundtract.wav"
-    };
-    private static final String[] BATTLE_SOUNDTRACK_PATHS = {
-            "/res/soundTrack/battle_soundtrack.mp3",
-            "/res/soundTrack/battle_sountrack.mp3",
-            "/res/soundTrack/battle_soundtract.mp3",
-            "/res/soundTrack/battle_soundtrack.wav",
-            "/res/soundTrack/battle_sountrack.wav",
-            "/res/soundTrack/battle_soundtract.wav"
-    };
-    private String activeSoundtrackKey = "";
-    private String[] activeSoundtrackPaths = MENU_SOUNDTRACK_PATHS;
-    private Clip menuSoundtrackClip;
-    private Object menuSoundtrackFxPlayer;
-    private java.net.URL menuSoundtrackMp3Url;
-    private URLClassLoader jLayerClassLoader;
-    private Thread menuSoundtrackMp3Thread;
-    private volatile Object menuSoundtrackJLayerPlayer;
-    private volatile boolean menuSoundtrackMp3StopRequested = false;
-    private boolean menuSoundtrackMuted = false;
-    private static final CharacterStats.CharacterType[] CHAR_TYPES = {
-            CharacterStats.CharacterType.IVAN,
-            CharacterStats.CharacterType.NIMUEL,
-            CharacterStats.CharacterType.SAM,
-            CharacterStats.CharacterType.JOHNFIEL
-    };
+    // NARRATION (post-vaughn)
+    private boolean narrating    = false;
+    private String[] narLines    = {};
+    private int      narIndex    = 0;
+    private boolean eWasNarHeld  = false;
 
-    // FADE TRANSITION
-    private float fadeAlpha = 0f;
-    private boolean fadingIn = true;
+    // FADE
+    private float   fadeAlpha  = 0f;
+    private boolean fadingIn   = true;
     public int pendingBattleEnemyColor = 0;
-    private float menuFadeAlpha = 0f;
-    private boolean menuFadeActive = false;
-    private boolean menuFadingOut = true;
-    private int menuFadeTargetState = titleState;
-    private static final float MENU_FADE_SPEED = 0.08f;
 
     // BATTLE
-    public EnemyStats enemyStats   = new EnemyStats();
-    private int enemyCurrentHP     = 0;
-    private int enemyMaxHP         = 0;
-    private int battleRound        = 1;
-    private String battleMessage   = "";
-    private String playerMoveDisplay = "";
-    private String enemyMoveDisplay  = "";
-    private boolean battleResolved   = false;
-    private boolean waitingForNext   = false;
-    private String enemyName         = "";
-    private BufferedImage battleSceneImage;
-    private BufferedImage battleHitboxImage;
-    private BufferedImage battleSpriteHitboxImage;
-    private BufferedImage battlePlayerImage;
-    private BufferedImage battleEnemyImage;
-    /** Set when battle sprites load — avoids scanning full PNG alpha every frame (was freezing the UI). */
-    private Rectangle battlePlayerOpaqueBounds;
-    private Rectangle battleEnemyOpaqueBounds;
+    public EnemyStats     enemyStats    = new EnemyStats();
+    private int   enemyHP               = 0;
+    private int   enemyMaxHP            = 0;
+    private int   battleRound           = 1;
+    private String battleMsg            = "";
+    private boolean battleResolved      = false;
+    private boolean waitingOutcome      = false;
+    private String  enemyName           = "";
+    private boolean isFinalBoss         = false;
+    private BattleSystem.Move lastPMove, lastEMove;
 
-    private BufferedImage battleItemIdle, battleItemHover;
-    private BufferedImage battleAbilityIdle, battleAbilityHover;
-    private BufferedImage battleRockIdle, battleRockHover;
-    private BufferedImage battlePaperIdle, battlePaperHover;
-    private BufferedImage battleScissorsIdle, battleScissorsHover;
-    private BufferedImage battleContinueIdle, battleContinueHover;
+    // ITEMS / ABILITIES
+    private ItemSystem    items     = new ItemSystem();
+    private AbilitySystem abilities = new AbilitySystem();
+    private String abilMsg          = "";
+    private int    abilMsgTimer     = 0;
 
-    /** Full-screen outcome scene and layout hitbox ({@code gle_outcome.png}, {@code outcome_hitbox.png}). */
-    private BufferedImage outcomeSceneImage;
-    private BufferedImage outcomeHitboxImage;
-    /** Win/lose illustration from {@code battleOutcomes/}; cleared when a new battle starts. */
-    private BufferedImage battleOutcomeArtImage;
+    // ACTIVE EFFECTS
+    private boolean fxUnoReverse   = false;
+    private boolean fxHypnotize    = false;
+    private boolean fxYouCheater   = false;
+    private boolean fxFullCounter  = false;
+    private int     fxHealRounds   = 0;
+    private int     fxHealAmt      = 0;
+    private int     fxEnergyRounds = 0;
 
-    private String battleHoverZone = "";
+    // CLAIRVOYANCE
+    private boolean clairVisible   = false;
+    private String  clairText      = "";
 
-    // BATTLE BUTTONS (screen-space; from colored regions on battle_hitbox, or fallback layout)
-    private Rectangle itemsBattleBtn = new Rectangle(0, 0, 0, 0);
-    private Rectangle abilitiesBattleBtn = new Rectangle(0, 0, 0, 0);
-    private Rectangle rockBtn, paperBtn, scissorsBtn, continueBtn;
+    // Tracks which state opened the item/ability panel so ESC returns correctly
+    private int prevStateBeforePanel = playState;
+    private int autoSaveCountdown = AUTOSAVE_INTERVAL_FRAMES;
 
-    // RNG
     private final Random rand = new Random();
 
+    // ─────────────────────────────────────────────────────────────
+    //  CONSTRUCTOR
+    // ─────────────────────────────────────────────────────────────
     public GamePanel() {
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
-        this.setBackground(Color.black);
+        this.setBackground(Color.BLACK);
         this.setDoubleBuffered(true);
         this.addKeyListener(keyH);
         this.setFocusable(true);
-        gameState = titleState;
+        gameState = menuState;
+        // Disable Swing tooltips (prevents hover text labels from popping up).
+        ToolTipManager.sharedInstance().setEnabled(false);
 
-        startBtn = new Rectangle(178, 155, 144, 25);
-        creditsBtn = new Rectangle(178, 187, 144, 25);
-        quitBtn = new Rectangle(178, 219, 144, 25);
-        continueMenuBtn = new Rectangle(179, 170, 142, 25);
-        selectCharacterBtn = new Rectangle(179, 202, 142, 25);
-        muteBtn = new Rectangle(23, 280, 25, 20);
-        settingsBtn = new Rectangle(16, 309, 62, 22);
-        ivanBtn = new Rectangle(83, 120, 74, 24);
-        samBtn = new Rectangle(164, 120, 76, 24);
-        nimuelBtn = new Rectangle(250, 120, 75, 24);
-        johnfielBtn = new Rectangle(334, 120, 81, 24);
+        loadAll();
+        saveData = SaveData.loadFromDisk();  // restore save across sessions
+        playMusic("menu_sountrack");
 
-        loadImages();
-        updateBackgroundSoundtrack();
-
-        this.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                if (menuFadeActive) return;
-                Point p = e.getPoint();
-
-                if (gameState == titleState) {
-                    String button = getMainMenuButtonAt(p);
-                    if ("mute".equals(button)) {
-                        toggleMenuSoundtrackMute();
-                        return;
-                    }
-                    if ("start".equals(button)) {
-                        clearMenuHover();
-                        startMenuFade(startMenuState);
-                        return;
-                    } else if ("quit".equals(button)) {
-                        quitGame();
-                        return;
-                    }
-                }
-
-                if (gameState == startMenuState) {
-                    String button = getStartMenuButtonAt(p);
-                    if ("mute".equals(button)) {
-                        toggleMenuSoundtrackMute();
-                        return;
-                    }
-                    if ("continue".equals(button) && player != null) {
-                        clearMenuHover();
-                        startMenuFade(playState);
-                        return;
-                    } else if ("continue".equals(button)) {
-                        clearMenuHover();
-                        startMenuFade(characterSelectState);
-                        return;
-                    } else if ("selectCharacter".equals(button)) {
-                        clearMenuHover();
-                        startMenuFade(characterSelectState);
-                        return;
-                    }
-                }
-
-                if (gameState == characterSelectState) {
-                    String menuButton = getCharacterSelectButtonAt(p);
-                    if ("mute".equals(menuButton)) {
-                        toggleMenuSoundtrackMute();
-                        return;
-                    }
-                    if ("settings".equals(menuButton)) {
-                        return;
-                    }
-                    String selectedCharacter = getCharacterNameAt(p);
-                    if (selectedCharacter != null) {
-                        selectChar(selectedCharacter);
-                    }
-                }
-
-                if (gameState == battleState) {
-                    handleBattleClick(p);
-                }
-            }
+        addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) { onClick(e.getPoint()); }
         });
-
-        this.addMouseMotionListener(new MouseAdapter() {
-            @Override
-            public void mouseMoved(MouseEvent e) {
-                if (menuFadeActive) return;
-                Point p = e.getPoint();
-                if (gameState == battleState) {
-                    String z = battleHoverZoneFromPoint(p);
-                    if (!z.equals(battleHoverZone)) {
-                        battleHoverZone = z;
-                        repaint();
-                    }
-                    return;
-                }
-                String prevButton = hoveredMenuButton;
-                int prevChar = hoveredCharIndex;
-                if (gameState == titleState) {
-                    hoveredMenuButton = getMainMenuButtonAt(p);
-                    hoveredCharIndex = -1;
-                    if (!hoveredMenuButton.equals(prevButton) || hoveredCharIndex != prevChar) repaint();
-                    return;
-                }
-                if (gameState == startMenuState) {
-                    hoveredMenuButton = getStartMenuButtonAt(p);
-                    hoveredCharIndex = -1;
-                    if (!hoveredMenuButton.equals(prevButton) || hoveredCharIndex != prevChar) repaint();
-                    return;
-                }
-                if (gameState != characterSelectState) return;
-                hoveredMenuButton = getCharacterSelectButtonAt(p);
-                hoveredCharIndex = getCharacterIndexAt(p);
-                if (hoveredCharIndex != prevChar || !hoveredMenuButton.equals(prevButton)) repaint();
+        addMouseMotionListener(new MouseAdapter() {
+            @Override public void mouseMoved(MouseEvent e) {
+                mouse = e.getPoint();
+                refreshHover();
+                repaint();
             }
         });
     }
 
-    /**
-     * Screen-space layout: top row Items | Abilities, bottom row Rock | Paper | Scissors,
-     * centered cluster (~reference layout). Overwritten by {@code battle_hitbox.png} regions when present.
-     */
-    private void layoutFallbackBattleButtons() {
-        int w = getWidth();
-        int h = getHeight();
-        int midX = w / 2;
-        int bh = Math.max(44, Math.min(68, h / 13));
-        int padBottom = Math.max(18, h / 26);
-        int rowGap = Math.max(8, h / 80);
-        int hGap = Math.max(8, w / 100);
-        int btnY = h - padBottom - bh;
-        int topY = btnY - bh - rowGap;
+    // ─────────────────────────────────────────────────────────────
+    //  RESOURCE LOADING
+    // ─────────────────────────────────────────────────────────────
+    private void loadAll() {
+        menuScreenImg = img("/res/gui/pixelart/menu/menu_screen.png");
+        logoImg       = img("/res/gui/pixelart/menu/fixsix_log.png");
 
-        int maxCluster = Math.min(640, w - 40);
-        int bottomW = (maxCluster - 2 * hGap) / 3;
-        int topW = Math.min((maxCluster - hGap) / 2, Math.max(48, (int) (bottomW * 0.90)));
-        int bottomCluster = 3 * bottomW + 2 * hGap;
-        int topCluster = 2 * topW + hGap;
+        menuMainHitbox  = img("/res/gui/button_hitbox/menu_main_hitbox.png");
+        menuStartHitbox = img("/res/gui/button_hitbox/menu_start_hitbox.png");
+        menuCharHitbox  = img("/res/gui/button_hitbox/menu_characterselect_hitbox.png");
+        battleHitbox    = img("/res/gui/button_hitbox/battle_hitbox.png");
+        battleSpriteHitbox = img("/res/gui/button_hitbox/battle_sprite_hitbox.png");
+        worldGuiHitbox  = img("/res/gui/button_hitbox/world_gui_hitbox.png");
+        outcomeHitbox   = img("/res/gui/button_hitbox/outcome_hitbox.png");
 
-        int bottomStart = midX - bottomCluster / 2;
-        int topStart = midX - topCluster / 2;
+        // Menu buttons
+        btn("start",    "/res/gui/buttons/menu/start_idle.png",           "/res/gui/buttons/menu/start_hover.png");
+        btn("credits",  "/res/gui/buttons/menu/credits_idle.png",         "/res/gui/buttons/menu/credits_hover.png");
+        btn("quit",     "/res/gui/buttons/menu/quit_idle.png",            "/res/gui/buttons/menu/quit_hover.png");
+        btn("settings", "/res/gui/buttons/menu/settings_idle.png",        "/res/gui/buttons/menu/settings_hover.png");
+        btn("mute",     "/res/gui/buttons/menu/mute_idle.png",            "/res/gui/buttons/menu/mute_hover.png");
+        btn("muted",    "/res/gui/buttons/menu/muted_idle.png",           "/res/gui/buttons/menu/muted_hover.png");
+        btn("save",     "/res/gui/buttons/menu/save_idle.png",            "/res/gui/buttons/menu/save_hover.png");
+        btn("continue", "/res/gui/buttons/menu/continue_idle.png",        "/res/gui/buttons/menu/continue_hover.png");
+        btn("selchar",  "/res/gui/buttons/menu/selectcharacter_idle.png", "/res/gui/buttons/menu/selectcharacter_hover.png");
 
-        itemsBattleBtn = new Rectangle(topStart, topY, topW, bh);
-        abilitiesBattleBtn = new Rectangle(topStart + topW + hGap, topY, topW, bh);
-        rockBtn = new Rectangle(bottomStart, btnY, bottomW, bh);
-        paperBtn = new Rectangle(bottomStart + bottomW + hGap, btnY, bottomW, bh);
-        scissorsBtn = new Rectangle(bottomStart + 2 * (bottomW + hGap), btnY, bottomW, bh);
+        // Player select
+        btn("ivan",     "/res/gui/buttons/player/ivan_idle.png",     "/res/gui/buttons/player/ivan_hover.png");
+        btn("sam",      "/res/gui/buttons/player/sam_idle.png",      "/res/gui/buttons/player/sam_hover.png");
+        btn("nimuel",   "/res/gui/buttons/player/nimuel_idle.png",   "/res/gui/buttons/player/nimuel_hover.png");
+        btn("johnfiel", "/res/gui/buttons/player/johnfiel_idle.png", "/res/gui/buttons/player/johnfiel_hover.png");
+
+        // World GUI
+        btn("item_inv",  "/res/gui/buttons/world/item_idle.png",       "/res/gui/buttons/world/item_hover.png");
+        btn("abil_inv",  "/res/gui/buttons/world/ability_idle.png",     "/res/gui/buttons/world/ability_hover.png");
+        btn("backmenu",  "/res/gui/buttons/world/backtomenu_idle.png",  "/res/gui/buttons/world/backtomenu_hover.png");
+        btn("wsave",     "/res/gui/buttons/world/save_idle.png",        "/res/gui/buttons/world/save_hover.png");
+        btn("wset",      "/res/gui/buttons/world/settings_idle.png",    "/res/gui/buttons/world/settings_hover.png");
+        btn("wmute",     "/res/gui/buttons/world/mute_idle.png",        "/res/gui/buttons/world/mute_hover.png");
+        btn("wmuted",    "/res/gui/buttons/world/muted_idle.png",       "/res/gui/buttons/world/muted_hover.png");
+
+        // Battle
+        btn("rock",     "/res/gui/buttons/battle/rock_idle.png",        "/res/gui/buttons/battle/rock_hover.png");
+        btn("paper",    "/res/gui/buttons/battle/paper_idle.png",        "/res/gui/buttons/battle/paper_hover.png");
+        btn("scissors", "/res/gui/buttons/battle/scissors_idle.png",     "/res/gui/buttons/battle/scissors_hover.png");
+        btn("contbat",  "/res/gui/buttons/battle/continue_idle.png",     "/res/gui/buttons/battle/continue_hover.png");
+        btn("useitem",  "/res/gui/buttons/battle/items_idle.png",        "/res/gui/buttons/battle/items_hover.png");
+        btn("useabil",  "/res/gui/buttons/battle/abilities_idle.png",    "/res/gui/buttons/battle/abilities_hover.png");
+
+        // Character previews
+        // Character-select preview images
+        charSelectImg.put("ivan",     img("/res/sprites/player/ivan/ivan_selectcharacter.png"));
+        charSelectImg.put("sam",      img("/res/sprites/player/sam/sam_selectcharacter.png"));
+        charSelectImg.put("nimuel",   img("/res/sprites/player/nimuel/nimuel_selectcharacter.png"));
+        charSelectImg.put("johnfiel", img("/res/sprites/player/johnfiel/johnfiel_selectcharacter.png"));
+
+        // NPC stands
+        String[] npcs = {"james","alieyandrew","kyle","johnru","adrian","darryll","gio","yohann","dirk","jake","vaughn"};
+        for (String n : npcs) npcStand.put(n, img("/res/sprites/enemies/" + n + "/" + n + "_stand.png"));
     }
 
-    private void updateBattleButtons() {
-        if (getWidth() <= 0 || getHeight() <= 0) {
-            return;
+    private BufferedImage img(String path) {
+        try { return ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(path))); }
+        catch (Exception e) { return null; }
+    }
+
+    private void btn(String key, String idle, String hover) {
+        btnImgs.put(key, new BufferedImage[]{ img(idle), img(hover) });
+    }
+
+    public void loadMapImages(String mapName) {
+        currentMapName = mapName;
+        currentDialog  = "";
+        dialogStage    = 0;
+        lastNPCColor   = 0;
+        pendingBattleEnemyColor = 0;
+        settingsOpen   = false;
+        narrating      = false;
+
+        switch (mapName) {
+            case GLE_MAP -> {
+                mapImage    = img("/res/gui/pixelart/map/gle.png");
+                hitboxImage = img("/res/gui/pixelart/map/gle_hitbox.png");
+                mapTitleImg = img("/res/gui/pixelart/map/gle_title.png");
+                playMusic("gle_soundtrack");
+            }
+            case FRONTGATE_MAP -> {
+                mapImage    = img("/res/gui/pixelart/map/frontgate.png");
+                hitboxImage = img("/res/gui/pixelart/map/frontgate_hitbox.png");
+                mapTitleImg = img("/res/gui/pixelart/map/frontgate_title.png");
+                playMusic("frontgate_soundtrack");
+            }
+            case EMALL_MAP -> {
+                mapImage    = null;
+                hitboxImage = null;
+                mapTitleImg = null;
+            }
         }
+        if (player != null) setPlayerSpawn();
+        autoSave();
+        repaint();
+    }
 
-        layoutFallbackBattleButtons();
-
-        int midX = getWidth() / 2;
-        int bh = Math.max(44, Math.min(68, getHeight() / 13));
-        int padBottom = Math.max(18, getHeight() / 26);
-        int btnY = getHeight() - padBottom - bh;
-
-        if (waitingForNext && outcomeHitboxImage != null) {
-            Rectangle contR = getColorBounds(outcomeHitboxImage, COLOR_BATTLE_CONTINUE_PINK);
-            continueBtn = contR != null ? contR : new Rectangle(midX - 100, btnY, 200, bh);
-            return;
-        }
-
-        if (battleHitboxImage != null) {
-            Rectangle itemsR = getColorBounds(battleHitboxImage, COLOR_BATTLE_ITEMS);
-            Rectangle abilR = getColorBounds(battleHitboxImage, COLOR_BATTLE_ABILITIES);
-            Rectangle rockR = getColorBounds(battleHitboxImage, COLOR_BATTLE_PICK_ROCK);
-            Rectangle paperR = getColorBounds(battleHitboxImage, COLOR_BATTLE_PICK_PAPER);
-            Rectangle sciR = getColorBounds(battleHitboxImage, COLOR_BATTLE_PICK_SCISSORS);
-            Rectangle contR = getColorBounds(battleHitboxImage, COLOR_BATTLE_CONTINUE_PINK);
-
-            // getColorBounds() already maps hitbox image → panel pixels; do not map twice.
-            if (itemsR != null) {
-                itemsBattleBtn = itemsR;
-            }
-            if (abilR != null) {
-                abilitiesBattleBtn = abilR;
-            }
-            if (rockR != null) {
-                rockBtn = rockR;
-            }
-            if (paperR != null) {
-                paperBtn = paperR;
-            }
-            if (sciR != null) {
-                scissorsBtn = sciR;
-            }
-
-            boolean haveRps = rockR != null && paperR != null && sciR != null;
-            if (!haveRps) {
-                Rectangle[] blob = detectBattleButtonBlobsImageSpace();
-                if (blob != null && blob.length >= 5) {
-                    java.util.Arrays.sort(blob, (a, b) -> {
-                        int rowA = a.y / 20;
-                        int rowB = b.y / 20;
-                        if (rowA != rowB) return Integer.compare(rowA, rowB);
-                        return Integer.compare(a.x, b.x);
-                    });
-                    itemsBattleBtn = mapHitboxImageRectToScreen(blob[0], battleHitboxImage);
-                    abilitiesBattleBtn = mapHitboxImageRectToScreen(blob[1], battleHitboxImage);
-                    rockBtn = mapHitboxImageRectToScreen(blob[2], battleHitboxImage);
-                    paperBtn = mapHitboxImageRectToScreen(blob[3], battleHitboxImage);
-                    scissorsBtn = mapHitboxImageRectToScreen(blob[4], battleHitboxImage);
+    // ─────────────────────────────────────────────────────────────
+    //  MUSIC
+    // ─────────────────────────────────────────────────────────────
+    private void playMusic(String name) {
+        if (name == null || name.isBlank()) return;
+        if (name.equals(musicTrack) && musicThread != null && musicThread.isAlive()) return;
+        stopMusic();
+        musicTrack = name;
+        if (isMuted) return;
+        stopMusicRequested = false;
+        musicThread = new Thread(() -> {
+            while (!stopMusicRequested) {
+                try (InputStream raw = openMusicStream(name)) {
+                    if (raw == null) return;
+                    javazoom.jl.player.Player player = new javazoom.jl.player.Player(new BufferedInputStream(raw));
+                    activeMusicPlayer = player;
+                    player.play();
+                } catch (Exception ignored) {
+                    return;
+                } finally {
+                    activeMusicPlayer = null;
                 }
             }
+        }, "music-" + name);
+        musicThread.setDaemon(true);
+        musicThread.start();
+    }
 
-            if (waitingForNext) {
-                continueBtn = contR != null
-                        ? contR
-                        : new Rectangle(midX - 100, btnY, 200, bh);
-            } else {
-                continueBtn = new Rectangle(0, 0, 0, 0);
-            }
+    private void stopMusic() {
+        stopMusicRequested = true;
+        javazoom.jl.player.Player player = activeMusicPlayer;
+        if (player != null) {
+            try { player.close(); } catch (Exception ignored) {}
+        }
+        if (musicThread != null && musicThread.isAlive()) {
+            try { musicThread.join(100); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        }
+        musicThread = null;
+        activeMusicPlayer = null;
+    }
+
+    private void applyVolume() {
+        if (isMuted) {
+            stopMusic();
+        } else if (!musicTrack.isBlank()) {
+            String track = musicTrack;
+            musicTrack = "";
+            playMusic(track);
+        }
+    }
+
+    public void toggleMute() { isMuted = !isMuted; applyVolume(); }
+
+    private InputStream openMusicStream(String name) {
+        String[] paths = {
+                "/res/soundtrack/" + name + ".mp3",
+                "/res/soundTrack/" + name + ".mp3",
+                "/res/soundtrack/" + name + ".wav",
+                "/res/soundTrack/" + name + ".wav"
+        };
+        for (String path : paths) {
+            InputStream stream = getClass().getResourceAsStream(path);
+            if (stream != null) return stream;
+        }
+        return null;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  SAVE / LOAD
+    // ─────────────────────────────────────────────────────────────
+    public void saveGame() {
+        autoSave();
+    }
+
+    private void autoSave() {
+        if (player == null) return;
+        saveData = new SaveData(player.characterName, currentMapName,
+                player.currentHP, player.maxHP, player.damageMultiplier,
+                new HashSet<>(enemyStats.getDefeatedEnemies()),
+                new ArrayList<>(items.getFlatList()),
+                new ArrayList<>(abilities.getAbilities()));
+        saveData.saveToDisk();
+    }
+
+    private void loadSave() {
+        if (saveData == null) return;
+        enemyStats = new EnemyStats();
+        items      = new ItemSystem();
+        abilities  = new AbilitySystem();
+        enemyStats.setDefeated(saveData.defeatedEnemies);
+        items.setItems(saveData.items);
+        abilities.setAbilities(saveData.abilities);
+        player = new Player(this, keyH, saveData.characterName);
+        player.currentHP        = saveData.playerHP;
+        player.maxHP            = saveData.playerMaxHP;
+        player.damageMultiplier = saveData.damageMultiplier;
+        loadMapImages(saveData.currentMapName);
+        gameState = playState;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  HITBOX COLOR LOOKUP
+    // ─────────────────────────────────────────────────────────────
+    private int colorAt(BufferedImage hb, Point p) {
+        if (hb == null) return 0;
+        int ix = p.x * hb.getWidth()  / Math.max(1, getWidth());
+        int iy = p.y * hb.getHeight() / Math.max(1, getHeight());
+        if (ix < 0 || ix >= hb.getWidth() || iy < 0 || iy >= hb.getHeight()) return 0;
+        return hb.getRGB(ix, iy) & 0xFFFFFF;
+    }
+
+    private void refreshHover() {
+        hoveredBtn = null;
+        hoveredCharColor = 0;
+        if (settingsOpen && settingsMuteRect().contains(mouse)) {
+            hoveredBtn = isMuted ? "wmuted" : "wmute";
             return;
         }
-
-        if (waitingForNext) {
-            continueBtn = new Rectangle(midX - 100, btnY, 200, bh);
-        } else {
-            continueBtn = new Rectangle(0, 0, 0, 0);
+        if ((gameState == menuState || gameState == menuCharState) && fixedMenuSettingsRect().contains(mouse)) {
+            hoveredBtn = "settings";
+            return;
         }
-    }
-
-    private Rectangle mapHitboxImageRectToScreen(Rectangle imageRect, BufferedImage reference) {
-        int x = imageRect.x * getWidth() / Math.max(1, reference.getWidth());
-        int y = imageRect.y * getHeight() / Math.max(1, reference.getHeight());
-        int w = Math.max(1, imageRect.width * getWidth() / Math.max(1, reference.getWidth()));
-        int h = Math.max(1, imageRect.height * getHeight() / Math.max(1, reference.getHeight()));
-        return new Rectangle(x, y, w, h);
-    }
-
-    private void handleBattleClick(Point p) {
-        if (waitingForNext) {
-            if (outcomeHitboxImage != null) {
-                if (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p)) {
-                    nextRound();
-                }
+        if (gameState == menuCharState) {
+            String charHover = charButtonAt(mouse);
+            if (charHover != null) {
+                hoveredBtn = charHover;
+                hoveredCharColor = charColor(charHover);
                 return;
             }
-            if (battleHitboxImage != null) {
-                int c = getMenuColorAt(p, battleHitboxImage);
-                if (c == COLOR_BATTLE_CONTINUE_PINK
-                        || (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p))) {
-                    nextRound();
-                }
-            } else if (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p)) {
-                nextRound();
-            }
+        }
+        if (gameState == playState || gameState == inventoryState || gameState == abilityState) {
+            hoveredBtn = worldButtonAt(mouse);
             return;
         }
-
-        String zone = battlePickNearestButtonZone(p);
-        if ("rock".equals(zone)) {
-            resolveBattle(BattleSystem.Move.ROCK);
-        } else if ("paper".equals(zone)) {
-            resolveBattle(BattleSystem.Move.PAPER);
-        } else if ("scissors".equals(zone)) {
-            resolveBattle(BattleSystem.Move.SCISSORS);
+        int c = switch (gameState) {
+            case menuState      -> colorAt(menuMainHitbox,  mouse);
+            case menuStartState -> colorAt(menuStartHitbox, mouse);
+            case menuCharState  -> colorAt(menuCharHitbox,  mouse);
+            case battleState    -> colorAt(battleHitbox,    mouse);
+            case outcomeState   -> colorAt(outcomeHitbox,   mouse);
+            default -> 0;
+        };
+        if (gameState == menuCharState && c == BC_HOVCHAR) {
+            hoveredCharColor = nearestCharColor(mouse);
         }
+        hoveredBtn = c2k(c);
     }
 
-    /**
-     * Hit-test battle buttons using screen rectangles only. If several rects overlap (common when
-     * {@code battle_hitbox.png} regions are loose), pick the button whose center is closest to the cursor.
-     */
-    private String battlePickNearestButtonZone(Point p) {
-        String[] names = {"items", "abilities", "rock", "paper", "scissors"};
-        Rectangle[] rects = {itemsBattleBtn, abilitiesBattleBtn, rockBtn, paperBtn, scissorsBtn};
-        java.util.ArrayList<Integer> hit = new java.util.ArrayList<>(5);
-        for (int i = 0; i < names.length; i++) {
-            Rectangle r = rects[i];
-            if (r != null && r.width > 0 && r.height > 0 && r.contains(p)) {
-                hit.add(i);
+    /** Scan nearby hitbox pixels to find which character slot is actually nearest */
+    private int nearestCharColor(Point p) {
+        if (menuCharHitbox == null) return 0;
+        int cx = p.x * menuCharHitbox.getWidth()  / Math.max(1,getWidth());
+        int cy = p.y * menuCharHitbox.getHeight() / Math.max(1,getHeight());
+        int[] ccs = HitboxColors.characterButtonColors();
+        for (int r = 0; r <= 10; r++) {
+            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++) {
+                if (Math.abs(dx) != r && Math.abs(dy) != r) continue;
+                int px = cx+dx, py = cy+dy;
+                if (px<0||px>=menuCharHitbox.getWidth()||py<0||py>=menuCharHitbox.getHeight()) continue;
+                int col = menuCharHitbox.getRGB(px,py)&0xFFFFFF;
+                for (int cc : ccs) if (col==cc) return cc;
             }
         }
-        if (hit.isEmpty()) {
-            return "";
-        }
-        if (hit.size() == 1) {
-            return names[hit.get(0)];
-        }
-        int bestIdx = hit.get(0);
-        long bestD = battleDistSqToRectCenter(p, rects[bestIdx]);
-        for (int k = 1; k < hit.size(); k++) {
-            int i = hit.get(k);
-            long d = battleDistSqToRectCenter(p, rects[i]);
-            if (d < bestD) {
-                bestD = d;
-                bestIdx = i;
-            }
-        }
-        return names[bestIdx];
+        return 0;
     }
 
-    private static long battleDistSqToRectCenter(Point p, Rectangle r) {
-        int cx = r.x + r.width / 2;
-        int cy = r.y + r.height / 2;
-        long dx = p.x - cx;
-        long dy = p.y - cy;
-        return dx * dx + dy * dy;
-    }
-
-    private String battleHoverZoneFromPoint(Point p) {
-        if (waitingForNext) {
-            if (outcomeHitboxImage != null) {
-                if (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p)) return "continue";
-                return "";
-            }
-            if (battleHitboxImage != null) {
-                int c = getMenuColorAt(p, battleHitboxImage);
-                if (c == COLOR_BATTLE_CONTINUE_PINK) return "continue";
-            }
-            if (continueBtn != null && continueBtn.width > 0 && continueBtn.contains(p)) return "continue";
-            return "";
-        }
-        return battlePickNearestButtonZone(p);
-    }
-
-    private void loadImages() {
-        try {
-            mapImage    = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/" + currentMapName + ".png")));
-            hitboxImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/" + currentMapName + "Hitboxes.png")));
-            mapTitleImage = readOptionalImage("/res/sprites/map/" + currentMapName + "_title.png");
-
-            jamesStand       = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/james/james_stand.png")));
-            alieyandrewStand = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/alieyandrew/alieyandrew_stand.png")));
-            kyleStand        = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/kyle/kyle_stand.png")));
-            johnruStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/johnru/johnru_stand.png")));
-            adrianStand      = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/enemies/adrian/adrian_stand.png")));
-
-            ivanStands = new BufferedImage[4];
-            ivanStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_front_stand.png")));
-            ivanStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_left_stand.png")));
-            ivanStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_back_stand.png")));
-            ivanStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/ivan/ivan_right_stand.png")));
-
-            nimuelStands = new BufferedImage[4];
-            nimuelStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_front_stand.png")));
-            nimuelStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_left_stand.png")));
-            nimuelStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_back_stand.png")));
-            nimuelStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/nimuel/nimuel_right_stand.png")));
-
-            samStands = new BufferedImage[4];
-            samStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_front_stand.png")));
-            samStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_left_stand.png")));
-            samStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_back_stand.png")));
-            samStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/sam/sam_right_stand.png")));
-
-            johnfielStands = new BufferedImage[4];
-            johnfielStands[0] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_front_stand.png")));
-            johnfielStands[1] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_left_stand.png")));
-            johnfielStands[2] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_back_stand.png")));
-            johnfielStands[3] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/player/johnfiel/johnfiel_right_stand.png")));
-            menuBackgroundImage = readImage("/res/sprites/menu/gui/menu_screen.png");
-            menuLogoImage = readImage("/res/sprites/menu/gui/fixsix_log.png");
-
-            startIdleImage = readImage("/res/sprites/menu/button/start_idle.png");
-            startHoverImage = readImage("/res/sprites/menu/button/start_hover.png");
-            creditsIdleImage = readImage("/res/sprites/menu/button/credits_idle.png");
-            creditsHoverImage = readImage("/res/sprites/menu/button/credits_hover.png");
-            quitIdleImage = readImage("/res/sprites/menu/button/quit_idle.png");
-            quitHoverImage = readImage("/res/sprites/menu/button/quit_hover.png");
-            continueIdleImage = readImage("/res/sprites/menu/button/continue_idle.png");
-            continueHoverImage = readImage("/res/sprites/menu/button/continue_hover.png");
-            selectCharacterIdleImage = readImage("/res/sprites/menu/button/selectcharacter_idle.png");
-            selectCharacterHoverImage = readImage("/res/sprites/menu/button/selectcharacter_hover.png");
-            muteIdleImage = readImage("/res/sprites/menu/button/mute_idle.png");
-            muteHoverImage = readImage("/res/sprites/menu/button/mute_hover.png");
-            settingsIdleImage = readImage("/res/sprites/menu/button/settings_idle.png");
-            settingsHoverImage = readImage("/res/sprites/menu/button/settings_hover.png");
-
-            characterButtonIdleImages = new BufferedImage[] {
-                    readImage("/res/sprites/menu/buttonPlayer/ivan_idle.png"),
-                    readImage("/res/sprites/menu/buttonPlayer/nimuel_idle.png"),
-                    readImage("/res/sprites/menu/buttonPlayer/sam_idle.png"),
-                    readImage("/res/sprites/menu/buttonPlayer/johnfiel_idle.png")
-            };
-
-            characterButtonHoverImages = new BufferedImage[] {
-                    readImage("/res/sprites/menu/buttonPlayer/ivan_hover.png"),
-                    readImage("/res/sprites/menu/buttonPlayer/nimuel_hover.png"),
-                    readImage("/res/sprites/menu/buttonPlayer/sam_hover.png"),
-                    readImage("/res/sprites/menu/buttonPlayer/johnfiel_hover.png")
-            };
-
-            characterSelectImages = new BufferedImage[] {
-                    readImage("/res/sprites/menu/menuCharacterSelect/ivan_selectcharacter.png"),
-                    readImage("/res/sprites/menu/menuCharacterSelect/nimuel_selectcharacter.png"),
-                    readImage("/res/sprites/menu/menuCharacterSelect/sam_selectcharacter.png"),
-                    readImage("/res/sprites/menu/menuCharacterSelect/johnfiel_selectcharacter.png")
-            };
-
-            menuStartHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_start_hitbox.png");
-            menuGuiHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_gui_hitbox.png");
-            menuCharacterSelectHitboxImage = readImage("/res/sprites/menu/menuHitbox/menu_characterselect_hitbox.png");
-            battleHitboxImage = readOptionalImage("/res/sprites/menu/menuHitbox/battle_hitbox.png");
-            battleSpriteHitboxImage = readOptionalImage("/res/sprites/menu/menuHitbox/battle_sprite_hitbox.png");
-            loadBattleUiArt();
-            refreshMenuIconColors();
-        } catch (Exception e) {
-            System.out.println("Image loading failed.");
-            e.printStackTrace();
-        }
-    }
-
-    private BufferedImage readImage(String path) throws Exception {
-        return ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(path)));
-    }
-
-    private BufferedImage readOptionalImage(String path) {
-        try {
-            java.io.InputStream stream = getClass().getResourceAsStream(path);
-            if (stream == null) return null;
-            return ImageIO.read(stream);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private BufferedImage makeWhiteTransparent(BufferedImage source) {
-        BufferedImage result = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        for (int y = 0; y < source.getHeight(); y++) {
-            for (int x = 0; x < source.getWidth(); x++) {
-                int argb = source.getRGB(x, y);
-                Color color = new Color(argb, true);
-                if (color.getRed() > 245 && color.getGreen() > 245 && color.getBlue() > 245) {
-                    result.setRGB(x, y, 0x00000000);
-                } else {
-                    result.setRGB(x, y, argb);
-                }
-            }
-        }
-        return result;
-    }
-
-    private Point toBasePoint(Point p) {
-        int baseX = p.x * 500 / Math.max(1, getWidth());
-        int baseY = p.y * 342 / Math.max(1, getHeight());
-        return new Point(baseX, baseY);
-    }
-
-    private int getHitboxColorAtBaseRectCenter(BufferedImage hitbox, Rectangle baseRect) {
-        if (hitbox == null || baseRect == null) return 0;
-        int centerBaseX = baseRect.x + baseRect.width / 2;
-        int centerBaseY = baseRect.y + baseRect.height / 2;
-        int imageX = Math.min(hitbox.getWidth() - 1, Math.max(0, centerBaseX * hitbox.getWidth() / 500));
-        int imageY = Math.min(hitbox.getHeight() - 1, Math.max(0, centerBaseY * hitbox.getHeight() / 342));
-        return hitbox.getRGB(imageX, imageY) & 0xFFFFFF;
-    }
-
-    private void refreshMenuIconColors() {
-        menuMuteColor = getHitboxColorAtBaseRectCenter(menuCharacterSelectHitboxImage, muteBtn);
-        menuSettingsColor = getHitboxColorAtBaseRectCenter(menuCharacterSelectHitboxImage, settingsBtn);
-
-        if (menuMuteColor == 0) menuMuteColor = getHitboxColorAtBaseRectCenter(menuGuiHitboxImage, muteBtn);
-        if (menuSettingsColor == 0) menuSettingsColor = getHitboxColorAtBaseRectCenter(menuGuiHitboxImage, settingsBtn);
-        if (menuMuteColor == 0) menuMuteColor = getHitboxColorAtBaseRectCenter(menuStartHitboxImage, muteBtn);
-        if (menuSettingsColor == 0) menuSettingsColor = getHitboxColorAtBaseRectCenter(menuStartHitboxImage, settingsBtn);
-    }
-
-    private Rectangle toScreenRect(Rectangle baseRect) {
-        int x = baseRect.x * getWidth() / 500;
-        int y = baseRect.y * getHeight() / 342;
-        int w = Math.max(1, baseRect.width * getWidth() / 500);
-        int h = Math.max(1, baseRect.height * getHeight() / 342);
-        return new Rectangle(x, y, w, h);
-    }
-
-    private boolean containsBasePoint(Rectangle baseRect, Point screenPoint) {
-        return baseRect.contains(toBasePoint(screenPoint));
-    }
-
-    private String getMainMenuButtonAt(Point p) {
-        int color = getMenuColorAt(p, menuStartHitboxImage);
-        if (color == COLOR_MENU_START) {
-            hoveredMenuColor = color;
-            return "start";
-        }
-        if (color == COLOR_MENU_CREDIT) {
-            hoveredMenuColor = color;
-            return "credits";
-        }
-        if (color == COLOR_MENU_QUIT) {
-            hoveredMenuColor = color;
-            return "quit";
-        }
-        if (color == COLOR_MENU_LOGO) {
-            hoveredMenuColor = color;
-            return "logo";
-        }
-        if (menuMuteColor != 0 && color == menuMuteColor) {
-            hoveredMenuColor = color;
-            return "mute";
-        }
-        if (menuSettingsColor != 0 && color == menuSettingsColor) {
-            hoveredMenuColor = color;
-            return "settings";
-        }
-
-        if (containsBasePoint(startBtn, p)) {
-            hoveredMenuColor = COLOR_MENU_START;
-            return "start";
-        }
-        if (containsBasePoint(creditsBtn, p)) {
-            hoveredMenuColor = COLOR_MENU_CREDIT;
-            return "credits";
-        }
-        if (containsBasePoint(quitBtn, p)) {
-            hoveredMenuColor = COLOR_MENU_QUIT;
-            return "quit";
-        }
-
-        hoveredMenuColor = 0;
-        if (containsBasePoint(muteBtn, p)) return "mute";
-        if (containsBasePoint(settingsBtn, p)) return "settings";
-        return "";
-    }
-
-    private String getStartMenuButtonAt(Point p) {
-        int color = getMenuColorAt(p, menuGuiHitboxImage);
-        if (color == COLOR_CONTINUE) {
-            hoveredMenuColor = color;
-            return "continue";
-        }
-        if (color == COLOR_SELECT_CHAR) {
-            hoveredMenuColor = color;
-            return "selectCharacter";
-        }
-        if (menuMuteColor != 0 && color == menuMuteColor) {
-            hoveredMenuColor = color;
-            return "mute";
-        }
-        if (menuSettingsColor != 0 && color == menuSettingsColor) {
-            hoveredMenuColor = color;
-            return "settings";
-        }
-
-        if (containsBasePoint(continueMenuBtn, p)) {
-            hoveredMenuColor = COLOR_CONTINUE;
-            return "continue";
-        }
-        if (containsBasePoint(selectCharacterBtn, p)) {
-            hoveredMenuColor = COLOR_SELECT_CHAR;
-            return "selectCharacter";
-        }
-
-        hoveredMenuColor = 0;
-        if (containsBasePoint(muteBtn, p)) return "mute";
-        if (containsBasePoint(settingsBtn, p)) return "settings";
-        return "";
-    }
-
-    private int getCharacterIndexAt(Point p) {
-        int color = getMenuColorAt(p, menuCharacterSelectHitboxImage);
-
-        if (color == COLOR_CHAR_IVAN) return 0;
-        if (color == COLOR_CHAR_NIMUEL) return 1;
-        if (color == COLOR_CHAR_SAM) return 2;
-        if (color == COLOR_CHAR_JOHNFIEL) return 3;
-
-        if (containsBasePoint(ivanBtn, p)) return 0;
-        if (containsBasePoint(nimuelBtn, p)) return 1;
-        if (containsBasePoint(samBtn, p)) return 2;
-        if (containsBasePoint(johnfielBtn, p)) return 3;
-        return -1;
-    }
-
-    private String getCharacterSelectButtonAt(Point p) {
-        int color = getMenuColorAt(p, menuCharacterSelectHitboxImage);
-        if (menuMuteColor != 0 && color == menuMuteColor) {
-            hoveredMenuColor = color;
-            return "mute";
-        }
-        if (menuSettingsColor != 0 && color == menuSettingsColor) {
-            hoveredMenuColor = color;
-            return "settings";
-        }
-
-        hoveredMenuColor = 0;
-        if (containsBasePoint(muteBtn, p)) return "mute";
-        if (containsBasePoint(settingsBtn, p)) return "settings";
-        return "";
-    }
-
-    private String getCharacterNameAt(Point p) {
-        return switch (getCharacterIndexAt(p)) {
-            case 0 -> "ivan";
-            case 1 -> "nimuel";
-            case 2 -> "sam";
-            case 3 -> "johnfiel";
+    private String c2k(int c) {
+        return switch (c) {
+            case BC_START    -> "start";
+            case BC_CREDIT   -> "credits";
+            case BC_QUIT     -> "quit";
+            case BC_SETTINGS -> "settings";
+            case BC_MUTE     -> (isMuted ? "wmuted" : "wmute");
+            case BC_SAVE     -> "save";
+            case BC_CONTINUE -> "continue";
+            case BC_SELCHAR  -> "selchar";
+            case BC_IVAN     -> "ivan";
+            case BC_SAM      -> "sam";
+            case BC_NIMUEL   -> "nimuel";
+            case BC_JOHNFIEL -> "johnfiel";
+            case BC_HOVCHAR  -> "ivan"; // placeholder; actual char from hoveredCharColor
+            case BC_ITEMS    -> "item_inv";
+            case BC_ABILINV  -> "abil_inv";
+            case BC_BACK     -> "backmenu";
+            case BC_ROCKBTN  -> "rock";
+            case BC_PAPERBTN -> "paper";
+            case BC_SCISSBTN -> "scissors";
+            case BC_CONTBAT  -> "contbat";
+            case BC_USEITEM  -> "useitem";
+            case BC_USEABIL  -> "useabil";
             default -> null;
         };
     }
 
-    private void clearMenuHover() {
-        hoveredMenuColor = 0;
-        hoveredMenuButton = "";
-        hoveredCharIndex = -1;
+    private String worldButtonAt(Point p) {
+        Rectangle settingsR = settingsWorldRect();
+        if (settingsR != null && settingsR.contains(p)) return "wset";
+        int c = colorAt(worldGuiHitbox, p);
+        return switch (c) {
+            case BC_ITEMS -> "item_inv";
+            case BC_ABILINV -> "abil_inv";
+            case BC_BACK -> "backmenu";
+            default -> null;
+        };
     }
 
-    public void loadMap(String mapName) {
-        currentMapName = mapName;
-        currentDialog = "";
-        dialogStage = 0;
-        lastNPCColor = 0;
-        pendingBattleEnemyColor = 0;
-
-        loadImages();
-        setPlayerSpawn();
-        repaint();
-    }
-
-    private BufferedImage[] getHoveredImages(int index) {
-        switch (index) {
-            case 0: return ivanStands;
-            case 1: return nimuelStands;
-            case 2: return samStands;
-            case 3: return johnfielStands;
-            default: return null;
-        }
-    }
-
-    private int getMenuColorAt(Point p, BufferedImage menuHitbox) {
-        if (menuHitbox == null || getWidth() <= 0 || getHeight() <= 0) return 0;
-        if (p.x < 0 || p.y < 0 || p.x >= getWidth() || p.y >= getHeight()) return 0;
-
-        int imageX = Math.min(menuHitbox.getWidth() - 1, p.x * menuHitbox.getWidth() / getWidth());
-        int imageY = Math.min(menuHitbox.getHeight() - 1, p.y * menuHitbox.getHeight() / getHeight());
-        return menuHitbox.getRGB(imageX, imageY) & 0xFFFFFF;
-    }
-
-    private Rectangle getColorBounds(BufferedImage image, int targetColor) {
-        if (image == null) return null;
-
-        int minX = image.getWidth();
-        int minY = image.getHeight();
-        int maxX = -1;
-        int maxY = -1;
-
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                if ((image.getRGB(x, y) & 0xFFFFFF) == targetColor) {
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
-                }
-            }
-        }
-
-        if (maxX < minX || maxY < minY) return null;
-        int sx = minX * getWidth() / image.getWidth();
-        int sy = minY * getHeight() / image.getHeight();
-        int sw = Math.max(1, (maxX - minX + 1) * getWidth() / image.getWidth());
-        int sh = Math.max(1, (maxY - minY + 1) * getHeight() / image.getHeight());
-        return new Rectangle(sx, sy, sw, sh);
-    }
-
-    private Rectangle getImageColorBounds(BufferedImage image, int targetColor) {
-        if (image == null) return null;
-
-        int minX = image.getWidth();
-        int minY = image.getHeight();
-        int maxX = -1;
-        int maxY = -1;
-
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                if ((image.getRGB(x, y) & 0xFFFFFF) == targetColor) {
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
-                }
-            }
-        }
-
-        if (maxX < minX || maxY < minY) return null;
-        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
-    }
-
-    private Rectangle getNonTransparentBounds(BufferedImage image) {
-        if (image == null) return null;
-
-        int minX = image.getWidth();
-        int minY = image.getHeight();
-        int maxX = -1;
-        int maxY = -1;
-
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                int alpha = (image.getRGB(x, y) >>> 24) & 0xFF;
-                if (alpha == 0) continue;
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-            }
-        }
-
-        if (maxX < minX || maxY < minY) return null;
-        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
-    }
-
-    private void quitGame() {
-        stopMenuSoundtrack();
-        gameThread = null;
-        Window window = SwingUtilities.getWindowAncestor(this);
-        if (window != null) {
-            window.dispose();
-        }
-        System.exit(0);
-        Runtime.getRuntime().halt(0);
-    }
-
-    public void selectChar(String name) {
-        if (player != null && player.characterName.equals(name)) {
-            clearMenuHover();
-            startMenuFade(playState);
+    // ─────────────────────────────────────────────────────────────
+    //  MOUSE CLICK
+    // ─────────────────────────────────────────────────────────────
+    private void onClick(Point p) {
+        if (settingsOpen) {
+            settingsClick(p);
             return;
         }
-
-        resetRunForNewCharacter();
-        player = new Player(this, keyH, name);
-        setPlayerSpawn();
-        clearMenuHover();
-        startMenuFade(playState);
-
-
-
+        if ((gameState == menuState || gameState == menuCharState) && fixedMenuSettingsRect().contains(p)) {
+            settingsOpen = true;
+            return;
+        }
+        int c;
+        switch (gameState) {
+            case menuState      -> { c = colorAt(menuMainHitbox, p);  menuClick(c); }
+            case menuStartState -> { c = colorAt(menuStartHitbox, p); menuStartClick(c); }
+            case menuCharState  -> { c = colorAt(menuCharHitbox, p);  charClick(c, p); }
+            case playState, inventoryState, abilityState -> {
+                worldClick(p);
+            }
+            case fadeState -> { }
+            case battleState -> { battleClick(colorAt(battleHitbox, p), p); }
+            case outcomeState -> { if (colorAt(outcomeHitbox, p) == BC_CONTBAT) nextRound(); }
+            case creditsState -> { if (keyH.escPressed) gameState = menuState; }
+        }
     }
 
-    private String getCharacterNameForColor(int color) {
-        if (color == COLOR_CHAR_IVAN) return "ivan";
-        if (color == COLOR_CHAR_NIMUEL) return "nimuel";
-        if (color == COLOR_CHAR_SAM) return "sam";
-        if (color == COLOR_CHAR_JOHNFIEL) return "johnfiel";
-        return null;
+    private void menuClick(int c) {
+        switch (c) {
+            case BC_START  -> gameState = menuStartState;
+            case BC_CREDIT -> gameState = creditsState;
+            case BC_QUIT   -> System.exit(0);
+        }
     }
 
-    private void resetRunForNewCharacter() {
-        currentMapName = START_MAP;
+    private void menuStartClick(int c) {
+        switch (c) {
+            case BC_CONTINUE -> { if (saveData != null) loadSave(); }
+            case BC_SELCHAR  -> gameState = menuCharState;
+            case BC_SETTINGS -> settingsOpen = !settingsOpen;
+        }
+    }
+
+    private void charClick(int c, Point p) {
+        String name = charButtonAt(p);
+        if (name == null) {
+            name = switch (c) {
+                case BC_IVAN     -> "ivan";
+                case BC_SAM      -> "sam";
+                case BC_NIMUEL   -> "nimuel";
+                case BC_JOHNFIEL -> "johnfiel";
+                case BC_HOVCHAR  -> charName(nearestCharColor(p));
+                default -> null;
+            };
+        }
+        if (name != null) selectChar(name);
+    }
+
+    private void worldClick(Point p) {
+        if (gameState == inventoryState) {
+            handleItemClick(p);
+        }
+        if (gameState == abilityState) {
+            handleAbilityClick(p);
+        }
+        String key = worldButtonAt(p);
+        if (key == null) return;
+        switch (key) {
+            case "item_inv" -> { prevStateBeforePanel = playState; toggleState(inventoryState); }
+            case "abil_inv" -> { prevStateBeforePanel = playState; toggleState(abilityState); }
+            case "backmenu" -> { gameState = menuState; stopMusic(); playMusic("menu_sountrack"); currentDialog = ""; autoSave(); }
+            case "wset" -> settingsOpen = true;
+        }
+    }
+
+    private void toggleState(int s) {
+        gameState = (gameState == s) ? playState : s;
+    }
+
+    private void battleClick(int c, Point p) {
+        if (clairVisible) { clairVisible = false; return; }
+        if (!waitingOutcome) {
+            switch (c) {
+                case BC_ROCKBTN  -> resolve(BattleSystem.Move.ROCK);
+                case BC_PAPERBTN -> resolve(BattleSystem.Move.PAPER);
+                case BC_SCISSBTN -> resolve(BattleSystem.Move.SCISSORS);
+                case BC_USEITEM  -> { if (!items.isEmpty()) { prevStateBeforePanel = battleState; gameState = inventoryState; } }
+                case BC_USEABIL  -> { if (!abilities.isEmpty()) { prevStateBeforePanel = battleState; gameState = abilityState; } }
+            }
+        }
+    }
+
+    private void settingsClick(Point p) {
+        Rectangle panelR = settingsPanelRect();
+        if (settingsMuteRect().contains(p)) {
+            toggleMute();
+        } else if (!panelR.contains(p)) {
+            settingsOpen = false;
+        }
+    }
+
+    private void handleItemClick(Point p) {
+        int pw=520, px=getWidth()/2-260, py=getHeight()/2-210;
+        List<ItemSystem.Item> list = items.getItems();
+        int iy = py + 72;
+        for (ItemSystem.Item item : list) {
+            if (new Rectangle(px+20, iy-28, pw-40, 38).contains(p)) { useItem(item); return; }
+            iy += 48;
+        }
+    }
+
+    private void handleAbilityClick(Point p) {
+        int pw=540, px=getWidth()/2-270, py=getHeight()/2-210;
+        List<AbilitySystem.Ability> list = abilities.getAbilities();
+        int ay = py + 72;
+        for (AbilitySystem.Ability ab : list) {
+            if (new Rectangle(px+20, ay-28, pw-40, 38).contains(p)) { useAbility(ab); return; }
+            ay += 48;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  CHARACTER SELECT
+    // ─────────────────────────────────────────────────────────────
+    public void selectChar(String name) {
+        // If the user picks the same character as the current save, continue the existing progress.
+        // If they pick a different character, reset everything back to a fresh run.
+        if (saveData != null && saveData.isForCharacter(name)) {
+            loadSave();
+            return;
+        }
         enemyStats = new EnemyStats();
-        currentDialog = "";
-        dialogStage = 0;
-        lastNPCColor = 0;
-        pendingBattleEnemyColor = 0;
-        enemyCurrentHP = 0;
-        enemyMaxHP = 0;
-        battleRound = 1;
-        battleMessage = "";
-        playerMoveDisplay = "";
-        enemyMoveDisplay = "";
-        battleResolved = false;
-        waitingForNext = false;
-        enemyName = "";
-        battleOutcomeArtImage = null;
-        loadImages();
-
+        items      = new ItemSystem();
+        abilities  = new AbilitySystem();
+        player = new Player(this, keyH, name);
+        loadMapImages(GLE_MAP);
+        gameState = playState;
+        autoSave();
     }
 
     public void setPlayerSpawn() {
-        if (hitboxImage == null) return;
-        int scaledTileSize = getScaledTileSize();
+        if (hitboxImage == null || player == null) return;
         for (int y = 0; y < hitboxImage.getHeight(); y++) {
             for (int x = 0; x < hitboxImage.getWidth(); x++) {
                 if ((hitboxImage.getRGB(x, y) & 0xFFFFFF) == COLOR_SPAWN) {
-                    player.x = (x * getWidth())  / hitboxImage.getWidth()  - (scaledTileSize / 2);
-                    player.y = (y * getHeight()) / hitboxImage.getHeight() - (scaledTileSize / 2);
+                    player.x = x * getWidth()  / hitboxImage.getWidth()  - tileSize/2;
+                    player.y = y * getHeight() / hitboxImage.getHeight() - tileSize/2;
                     player.saveSpawn(player.x, player.y);
                     return;
                 }
@@ -1000,1406 +656,906 @@ public class GamePanel extends JPanel implements Runnable {
         }
     }
 
-    /** Starts battle immediately (no fade / no intermediate screen). */
+    private String charName(int c) {
+        return HitboxColors.charName(c);
+    }
+
+    private int charColor(String name) {
+        return HitboxColors.charColor(name);
+    }
+
+    private Rectangle charPreviewRect() {
+        // Prefer the dedicated preview area from the hitbox PNG (green area).
+        if (menuCharHitbox != null) {
+            Rectangle r = bounds(menuCharHitbox, BC_HOVCHAR);
+            if (r != null) return r;
+        }
+        // Fallback: centered preview area.
+        int w = Math.max(1, (int) (getWidth() * 0.34));
+        int h = Math.max(1, (int) (getHeight() * 0.62));
+        int x = getWidth() / 2 - w / 2;
+        int y = Math.max(1, (int) (getHeight() * 0.20));
+        return new Rectangle(x, y, w, h);
+    }
+
+    private Rectangle charButtonRect(String name) {
+        // Preferred: use the hitbox PNG regions so the layout matches the reference screen.
+        if (menuCharHitbox != null) {
+            int c = charColor(name);
+            if (c != 0) {
+                Rectangle r = bounds(menuCharHitbox, c);
+                if (r != null) return r;
+            }
+        }
+        // Fallback: a simple vertical list.
+        int x = 42 * getWidth() / 500;
+        int w = 92 * getWidth() / 500;
+        int h = 28 * getHeight() / 342;
+        int gap = 10 * getHeight() / 342;
+        int top = 76 * getHeight() / 342;
+        int index = switch (name) {
+            case "ivan" -> 0;
+            case "sam" -> 1;
+            case "nimuel" -> 2;
+            case "johnfiel" -> 3;
+            default -> -1;
+        };
+        if (index < 0) return null;
+        return new Rectangle(x, top + index * (h + gap), Math.max(1, w), Math.max(1, h));
+    }
+
+    private String charButtonAt(Point p) {
+        for (String name : List.of("ivan", "sam", "nimuel", "johnfiel")) {
+            Rectangle r = charButtonRect(name);
+            if (r != null && r.contains(p)) return name;
+        }
+        return null;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  FADE
+    // ─────────────────────────────────────────────────────────────
     public void startFadeToBlack() {
-        currentDialog = "";
-        // Prepare sprites and HP before battleState so EDT repaint cannot paint battle UI with the
-        // previous enemy's stance (game loop is not the Swing EDT).
-        startBattle();
-        gameState = battleState;
-    }
-
-    private void startMenuFade(int targetState) {
-        if (gameState == targetState) return;
-        menuFadeTargetState = targetState;
-        menuFadeAlpha = 0f;
-        menuFadingOut = true;
-        menuFadeActive = true;
-    }
-
-    private void updateMenuFade() {
-        if (!menuFadeActive) return;
-
-        if (menuFadingOut) {
-            menuFadeAlpha += MENU_FADE_SPEED;
-            if (menuFadeAlpha >= 1f) {
-                menuFadeAlpha = 1f;
-                gameState = menuFadeTargetState;
-                clearMenuHover();
-                menuFadingOut = false;
-            }
-        } else {
-            menuFadeAlpha -= MENU_FADE_SPEED;
-            if (menuFadeAlpha <= 0f) {
-                menuFadeAlpha = 0f;
-                menuFadeActive = false;
-            }
-        }
-    }
-
-    private void loadMenuSoundtrack() {
-        stopMenuSoundtrack();
-        menuSoundtrackMp3Url = null;
-        StringBuilder loadErrors = new StringBuilder();
-        for (String path : activeSoundtrackPaths) {
-            java.net.URL resource = resolveAudioUrl(path);
-            if (resource == null) {
-                loadErrors.append("Missing: ").append(path).append('\n');
-                continue;
-            }
-            if (tryLoadMenuSoundtrackWithClip(resource)) {
-                System.out.println("Loaded menu soundtrack via Clip: " + resource);
-                return;
-            }
-            if (tryLoadMenuSoundtrackWithJavaFx(resource)) {
-                System.out.println("Loaded menu soundtrack via JavaFX: " + resource);
-                return;
-            }
-            if (tryPrepareMenuSoundtrackWithJLayer(resource)) {
-                System.out.println("Loaded menu soundtrack via JLayer: " + resource);
-                return;
-            }
-            loadErrors.append("Unsupported/failed decode: ").append(resource).append('\n');
-        }
-        System.out.println("Menu soundtrack could not be loaded.");
-        if (loadErrors.length() > 0) {
-            System.out.println(loadErrors);
-        }
-        System.out.println("Tip: add soundtrack files under src/res/soundTrack/.");
-    }
-
-    private boolean tryPrepareMenuSoundtrackWithJLayer(java.net.URL resource) {
-        String lower = resource.toString().toLowerCase();
-        if (!lower.endsWith(".mp3")) return false;
-        if (!isJLayerAvailable()) return false;
-        menuSoundtrackMp3Url = resource;
-        return true;
-    }
-
-    private boolean isJLayerAvailable() {
-        try {
-            loadJLayerAdvancedPlayerClass();
-            return true;
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private URLClassLoader getJLayerClassLoader() {
-        if (jLayerClassLoader != null) return jLayerClassLoader;
-        try {
-            // If classes are already on classpath, no custom loader needed.
-            Class.forName("javazoom.jl.player.advanced.AdvancedPlayer");
-            return null;
-        } catch (ClassNotFoundException ignored) {
-        }
-        try {
-            File jar = new File("lib", "jl1.0.1.jar");
-            if (!jar.exists()) return null;
-            jLayerClassLoader = new URLClassLoader(
-                    new java.net.URL[]{jar.toURI().toURL()},
-                    getClass().getClassLoader()
-            );
-            Class.forName("javazoom.jl.player.advanced.AdvancedPlayer", true, jLayerClassLoader);
-            return jLayerClassLoader;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private Class<?> loadJLayerAdvancedPlayerClass() throws ClassNotFoundException {
-        URLClassLoader cl = getJLayerClassLoader();
-        if (cl == null) {
-            return Class.forName("javazoom.jl.player.advanced.AdvancedPlayer");
-        }
-        return Class.forName("javazoom.jl.player.advanced.AdvancedPlayer", true, cl);
-    }
-
-    private void startJLayerMenuSoundtrack() {
-        if (menuSoundtrackMp3Url == null || menuSoundtrackMp3Thread != null) return;
-        menuSoundtrackMp3StopRequested = false;
-        Thread t = new Thread(() -> {
-            try {
-                Class<?> playerClass = loadJLayerAdvancedPlayerClass();
-                java.lang.reflect.Constructor<?> constructor = playerClass.getConstructor(InputStream.class);
-                Method playMethod = playerClass.getMethod("play");
-                Method closeMethod = playerClass.getMethod("close");
-
-                while (!menuSoundtrackMp3StopRequested) {
-                    try (InputStream raw = menuSoundtrackMp3Url.openStream();
-                         BufferedInputStream buffered = new BufferedInputStream(raw)) {
-                        Object player = constructor.newInstance(buffered);
-                        menuSoundtrackJLayerPlayer = player;
-                        playMethod.invoke(player);
-                        menuSoundtrackJLayerPlayer = null;
-                        closeMethod.invoke(player);
-                    }
-                }
-            } catch (Exception e) {
-                if (!menuSoundtrackMp3StopRequested) {
-                    System.out.println("JLayer menu soundtrack error: " + e.getMessage());
-                }
-            } finally {
-                menuSoundtrackJLayerPlayer = null;
-                menuSoundtrackMp3Thread = null;
-            }
-        }, "menu-mp3-loop");
-        t.setDaemon(true);
-        menuSoundtrackMp3Thread = t;
-        t.start();
-    }
-
-    private void stopJLayerMenuSoundtrack() {
-        menuSoundtrackMp3StopRequested = true;
-        Object player = menuSoundtrackJLayerPlayer;
-        if (player != null) {
-            try {
-                Method closeMethod = player.getClass().getMethod("close");
-                closeMethod.invoke(player);
-            } catch (Exception ignored) {
-            }
-        }
-        Thread t = menuSoundtrackMp3Thread;
-        if (t != null) {
-            t.interrupt();
-        }
-    }
-
-    private java.net.URL resolveAudioUrl(String resourcePath) {
-        try {
-            java.net.URL classpathUrl = getClass().getResource(resourcePath);
-            if (classpathUrl != null) return classpathUrl;
-
-            String relative = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
-            File workspaceFile = new File("src", relative);
-            if (workspaceFile.exists()) return workspaceFile.toURI().toURL();
-        } catch (Exception ignored) {
-        }
-        return null;
-    }
-
-    private boolean tryLoadMenuSoundtrackWithClip(java.net.URL resource) {
-        try {
-            AudioInputStream stream = AudioSystem.getAudioInputStream(resource);
-            Clip clip = AudioSystem.getClip();
-            clip.open(stream);
-            stream.close();
-            menuSoundtrackClip = clip;
-            return true;
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private boolean tryLoadMenuSoundtrackWithJavaFx(java.net.URL resource) {
-        try {
-            Class<?> jfxPanelClass = Class.forName("javafx.embed.swing.JFXPanel");
-            jfxPanelClass.getDeclaredConstructor().newInstance();
-            Class<?> mediaClass = Class.forName("javafx.scene.media.Media");
-            Class<?> mediaPlayerClass = Class.forName("javafx.scene.media.MediaPlayer");
-            Class<?> javafxApplicationClass = Class.forName("javafx.application.Platform");
-            Class<?> runnableClass = Class.forName("java.lang.Runnable");
-
-            Object media = mediaClass.getConstructor(String.class).newInstance(resource.toURI().toString());
-            Object player = mediaPlayerClass.getConstructor(mediaClass).newInstance(media);
-
-            Method runLaterMethod = javafxApplicationClass.getMethod("runLater", runnableClass);
-            Method setCycleCountMethod = mediaPlayerClass.getMethod("setCycleCount", int.class);
-            Method setMuteMethod = mediaPlayerClass.getMethod("setMute", boolean.class);
-            Method playMethod = mediaPlayerClass.getMethod("play");
-            int indefinite = mediaPlayerClass.getField("INDEFINITE").getInt(null);
-
-            runLaterMethod.invoke(null, (Runnable) () -> {
-                try {
-                    setCycleCountMethod.invoke(player, indefinite);
-                    setMuteMethod.invoke(player, menuSoundtrackMuted);
-                    playMethod.invoke(player);
-                } catch (Exception ignored) {
-                }
-            });
-            menuSoundtrackFxPlayer = player;
-            return true;
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private void runOnJavaFxThread(Runnable action) {
-        try {
-            Class<?> javafxApplicationClass = Class.forName("javafx.application.Platform");
-            Method runLaterMethod = javafxApplicationClass.getMethod("runLater", Runnable.class);
-            runLaterMethod.invoke(null, action);
-        } catch (Exception ignored) {
-        }
-    }
-
-    private void setJavaFxPlayerMute(boolean muted) {
-        if (menuSoundtrackFxPlayer == null) return;
-        runOnJavaFxThread(() -> {
-            try {
-                Method setMuteMethod = menuSoundtrackFxPlayer.getClass().getMethod("setMute", boolean.class);
-                setMuteMethod.invoke(menuSoundtrackFxPlayer, muted);
-            } catch (Exception ignored) {
-            }
-        });
-    }
-
-    private void playJavaFxMenuSoundtrack() {
-        if (menuSoundtrackFxPlayer == null) return;
-        runOnJavaFxThread(() -> {
-            try {
-                Method playMethod = menuSoundtrackFxPlayer.getClass().getMethod("play");
-                playMethod.invoke(menuSoundtrackFxPlayer);
-            } catch (Exception ignored) {
-            }
-        });
-    }
-
-    private void pauseJavaFxMenuSoundtrack() {
-        if (menuSoundtrackFxPlayer == null) return;
-        runOnJavaFxThread(() -> {
-            try {
-                Method pauseMethod = menuSoundtrackFxPlayer.getClass().getMethod("pause");
-                pauseMethod.invoke(menuSoundtrackFxPlayer);
-            } catch (Exception ignored) {
-            }
-        });
-    }
-
-    private void disposeJavaFxMenuSoundtrack() {
-        if (menuSoundtrackFxPlayer == null) return;
-        Object player = menuSoundtrackFxPlayer;
-        menuSoundtrackFxPlayer = null;
-        runOnJavaFxThread(() -> {
-            try {
-                Method stopMethod = player.getClass().getMethod("stop");
-                Method disposeMethod = player.getClass().getMethod("dispose");
-                stopMethod.invoke(player);
-                disposeMethod.invoke(player);
-            } catch (Exception ignored) {
-            }
-        });
-    }
-
-    private void stopMenuSoundtrack() {
-        stopJLayerMenuSoundtrack();
-        if (menuSoundtrackClip != null) {
-            menuSoundtrackClip.stop();
-            menuSoundtrackClip.close();
-            menuSoundtrackClip = null;
-        }
-        disposeJavaFxMenuSoundtrack();
-    }
-
-    private boolean isMenuState(int state) {
-        return state == titleState || state == startMenuState || state == characterSelectState;
-    }
-
-    private String getTargetSoundtrackKey() {
-        if (isMenuState(gameState) || (menuFadeActive && isMenuState(menuFadeTargetState))) {
-            return "menu";
-        }
-        if (gameState == battleState) {
-            return "battle";
-        }
-        if (gameState == playState && START_MAP.equals(currentMapName)) {
-            return "gle";
-        }
-        return "";
-    }
-
-    private String[] getSoundtrackPathsByKey(String key) {
-        if ("menu".equals(key)) return MENU_SOUNDTRACK_PATHS;
-        if ("battle".equals(key)) return BATTLE_SOUNDTRACK_PATHS;
-        if ("gle".equals(key)) return GLE_SOUNDTRACK_PATHS;
-        return null;
-    }
-
-    private void updateBackgroundSoundtrack() {
-        String targetKey = getTargetSoundtrackKey();
-        if (!targetKey.equals(activeSoundtrackKey)) {
-            activeSoundtrackKey = targetKey;
-            if (targetKey.isEmpty()) {
-                stopMenuSoundtrack();
-            } else {
-                String[] paths = getSoundtrackPathsByKey(targetKey);
-                if (paths != null) {
-                    activeSoundtrackPaths = paths;
-                    loadMenuSoundtrack();
-                }
-            }
-        }
-        updateMenuSoundtrackPlayback();
-    }
-
-    private void toggleMenuSoundtrackMute() {
-        menuSoundtrackMuted = !menuSoundtrackMuted;
-        updateMenuSoundtrackPlayback();
-    }
-
-    private void updateMenuSoundtrackPlayback() {
-        if (menuSoundtrackClip == null && menuSoundtrackFxPlayer == null && menuSoundtrackMp3Url == null) return;
-        if (menuSoundtrackMuted || activeSoundtrackKey.isEmpty()) {
-            if (menuSoundtrackClip != null) menuSoundtrackClip.stop();
-            pauseJavaFxMenuSoundtrack();
-            setJavaFxPlayerMute(true);
-            stopJLayerMenuSoundtrack();
-            return;
-        }
-        if (menuSoundtrackClip != null && !menuSoundtrackClip.isRunning()) {
-            if (menuSoundtrackClip.getFramePosition() >= menuSoundtrackClip.getFrameLength()) {
-                menuSoundtrackClip.setFramePosition(0);
-            }
-            menuSoundtrackClip.loop(Clip.LOOP_CONTINUOUSLY);
-        }
-        setJavaFxPlayerMute(false);
-        playJavaFxMenuSoundtrack();
-        startJLayerMenuSoundtrack();
+        gameState = fadeState; fadeAlpha = 0f; fadingIn = true; currentDialog = "";
     }
 
     private void updateFade() {
-        if (fadingIn) {
-            fadeAlpha += 0.015f;
-            if (fadeAlpha >= 1f) {
-                fadeAlpha = 1f;
-                fadingIn  = false;
-            }
+        if (!fadingIn) return;
+        fadeAlpha = Math.min(1f, fadeAlpha + 0.015f);
+        if (fadeAlpha >= 1f) {
+            fadingIn = false;
+            startBattle();
+            gameState = battleState;
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    //  BATTLE
+    // ─────────────────────────────────────────────────────────────
     private void startBattle() {
-        battleHoverZone = "";
-        loadBattleUiArt();
-        loadBattleAssets();
-        enemyMaxHP        = enemyStats.getEnemyHP(pendingBattleEnemyColor);
-        enemyCurrentHP    = enemyMaxHP;
-        battleRound       = 1;
-        playerMoveDisplay = "";
-        enemyMoveDisplay  = "";
-        battleResolved    = false;
-        waitingForNext    = false;
-        battleOutcomeArtImage = null;
-        enemyName         = getEnemyName(pendingBattleEnemyColor);
-        battleMessage     = "Round " + battleRound + " - Choose your move!";
-    }
+        enemyMaxHP     = enemyStats.getEnemyHP(pendingBattleEnemyColor);
+        enemyHP        = enemyMaxHP;
+        battleRound    = 1;
+        battleMsg      = "Round " + battleRound + " - Choose your move!";
+        battleResolved = false;
+        waitingOutcome = false;
+        isFinalBoss    = (pendingBattleEnemyColor == COLOR_FINALBOSS);
+        enemyName      = enemyName(pendingBattleEnemyColor);
 
-    private String getEnemyName(int color) {
-        if (color == COLOR_JAMES)       return "James";
-        if (color == COLOR_ALIEYANDREW) return "Alieyandrew";
-        if (color == COLOR_KYLE)        return "Kyle";
-        if (color == COLOR_JOHNRU)      return "Johnru";
-        if (color == COLOR_ADRIAN)      return "Adrian";
-        return "Enemy";
-    }
-
-    private BufferedImage readFirstExisting(String... paths) {
-        for (String path : paths) {
-            BufferedImage img = readOptionalImage(path);
-            if (img != null) return img;
-        }
-        return null;
-    }
-
-    private void loadBattleUiArt() {
-        String base = "/res/sprites/menu/battleButton/";
-        battleItemIdle = readFirstExisting(base + "items_idle.png", base + "item_idle.png");
-        battleItemHover = readFirstExisting(base + "items_hover.png", base + "item_hover.png");
-        battleAbilityIdle = readFirstExisting(base + "abilities_idle.png", base + "ability_idle.png");
-        battleAbilityHover = readFirstExisting(base + "abilities_hover.png", base + "ability_hovers.png", base + "ability_hover.png");
-        battleRockIdle = readFirstExisting(base + "rock_idle.png");
-        battleRockHover = readFirstExisting(base + "rock_hover.png");
-        battlePaperIdle = readFirstExisting(base + "paper_idle.png");
-        battlePaperHover = readFirstExisting(base + "paper_hover.png");
-        battleScissorsIdle = readFirstExisting(base + "scissors_idle.png");
-        battleScissorsHover = readFirstExisting(base + "scissors_hover.png");
-        battleContinueIdle = readFirstExisting(base + "continue_idle.png");
-        battleContinueHover = readFirstExisting(base + "continue_hover.png");
-        if (battleContinueIdle == null) battleContinueIdle = continueIdleImage;
-        if (battleContinueHover == null) battleContinueHover = continueHoverImage;
-
-        outcomeHitboxImage = readOptionalImage("/res/sprites/menu/menuHitbox/outcome_hitbox.png");
-        outcomeSceneImage = readOptionalImage("/res/sprites/menu/battleScene/gle_outcome.png");
-    }
-
-    private String getEnemySpriteKey(int color) {
-        if (color == COLOR_JAMES) return "james";
-        if (color == COLOR_ALIEYANDREW) return "alieyandrew";
-        if (color == COLOR_KYLE) return "kyle";
-        if (color == COLOR_JOHNRU) return "johnru";
-        if (color == COLOR_ADRIAN) return "adrian";
-        return "";
-    }
-
-    private void loadBattleAssets() {
-        battlePlayerImage = null;
-        battleEnemyImage = null;
-        battlePlayerOpaqueBounds = null;
-        battleEnemyOpaqueBounds = null;
-
-        String mapBattlePath = "/res/sprites/menu/battleScene/" + currentMapName + "_battle.png";
-        battleSceneImage = readOptionalImage(mapBattlePath);
-        if (battleSceneImage == null) {
-            battleSceneImage = readOptionalImage("/res/sprites/menu/battleScene/" + currentMapName + "_outcome.png");
-        }
-
-        String playerKey = CharacterStats.CharacterType.fromName(player.characterName).name().toLowerCase();
-        battlePlayerImage = readFirstExisting(
-                "/res/sprites/player/" + playerKey + "/" + playerKey + "_battle.png",
-                "/res/sprites/player/" + player.characterName + "/" + player.characterName + "_battle.png");
-
-        String enemyKey = getEnemySpriteKey(pendingBattleEnemyColor);
-        if (!enemyKey.isEmpty()) {
-            battleEnemyImage = readOptionalImage("/res/sprites/enemies/" + enemyKey + "/" + enemyKey + "_battle.png");
-        } else {
-            battleEnemyImage = null;
-        }
-
-        battlePlayerOpaqueBounds = battlePlayerImage != null ? getNonTransparentBounds(battlePlayerImage) : null;
-        battleEnemyOpaqueBounds = battleEnemyImage != null ? getNonTransparentBounds(battleEnemyImage) : null;
-    }
-
-    private static String battleMoveFileTag(BattleSystem.Move move) {
-        return switch (move) {
-            case ROCK -> "rock";
-            case PAPER -> "paper";
-            case SCISSORS -> "scissors";
+        String mapKey = switch (currentMapName) {
+            case GLE_MAP -> "gle"; case FRONTGATE_MAP -> "frontgate"; default -> "emall";
         };
+        battleSceneImg  = img("/res/gui/pixelart/battle_scene/" + mapKey + "_battle.png");
+        outcomeSceneImg = img("/res/gui/pixelart/battle_scene/" + mapKey + "_outcome.png");
+
+        String folder = enemyFolder(pendingBattleEnemyColor);
+        if (folder != null) {
+            enemyBattleImg = img("/res/sprites/enemies/" + folder + "/" + folder + "_battle.png");
+            enemyDialogImg = img("/res/sprites/enemies/" + folder + "/" + folder + "_dialog.png");
+        } else if (isFinalBoss) {
+            enemyBattleImg = img("/res/sprites/enemies/finalboss/final_boss.png");
+            enemyDialogImg = enemyBattleImg;
+        }
+        if (player != null) {
+            String pn = player.characterName;
+            playerBattleImg = img("/res/sprites/player/" + pn + "/" + pn + "_battle.png");
+            playerDialogImg = img("/res/sprites/player/" + pn + "/" + pn + "_dialog.png");
+        }
+        playMusic("battle_sountrack");
     }
 
-    /**
-     * PNGs in {@code /res/sprites/menu/battleOutcomes/}: primary {@code <your_move>_<enemy_move>.png}
-     * (e.g. {@code paper_paper.png}, {@code rock_scissors.png}). If missing and the battle just ended,
-     * falls back to character win/lose filenames ({@code win_<enemy>.png}, {@code lose_<player>.png}, …).
-     */
-    private void loadBattleOutcomeArt(BattleSystem.Move playerMove, BattleSystem.Move enemyMove) {
-        battleOutcomeArtImage = null;
-        String base = "/res/sprites/menu/battleOutcomes/";
-        battleOutcomeArtImage = readOptionalImage(
-                base + battleMoveFileTag(playerMove) + "_" + battleMoveFileTag(enemyMove) + ".png");
-        if (!battleResolved || battleOutcomeArtImage != null) {
+    private String enemyName(int c) {
+        return HitboxColors.enemyName(c);
+    }
+
+    private String enemyFolder(int c) {
+        return HitboxColors.enemyFolder(c);
+    }
+
+    private void resolve(BattleSystem.Move pm) {
+        BattleSystem.Move em = fxHypnotize ? BattleSystem.Move.ROCK : BattleSystem.getRandomEnemyMove();
+        fxHypnotize = false;
+        clairVisible = false;
+        lastPMove = pm; lastEMove = em;
+
+        BattleSystem.BattleResult result = BattleSystem.resolve(pm, em);
+
+        if (result == BattleSystem.BattleResult.ENEMY_WIN && fxYouCheater) {
+            fxYouCheater = false;
+            battleMsg = "You Cheater activated! Round voided — pick again.";
             return;
         }
 
-        String playerKey = CharacterStats.CharacterType.fromName(player.characterName).name().toLowerCase();
-        String enemyKey = getEnemySpriteKey(pendingBattleEnemyColor);
-        boolean playerWon = enemyCurrentHP <= 0;
-
-        if (playerWon) {
-            if (!enemyKey.isEmpty()) {
-                battleOutcomeArtImage = readFirstExisting(
-                        base + "win_" + enemyKey + ".png",
-                        base + enemyKey + "_defeat.png",
-                        base + enemyKey + "_lose.png");
-            }
-            if (battleOutcomeArtImage == null) {
-                battleOutcomeArtImage = readFirstExisting(
-                        base + playerKey + "_win.png",
-                        base + "win_" + playerKey + ".png",
-                        base + "player_win.png");
-            }
-        } else {
-            battleOutcomeArtImage = readFirstExisting(
-                    base + "lose_" + playerKey + ".png",
-                    base + playerKey + "_lose.png",
-                    base + playerKey + "_defeat.png");
-            if (battleOutcomeArtImage == null && !enemyKey.isEmpty()) {
-                battleOutcomeArtImage = readFirstExisting(
-                        base + "win_" + enemyKey + ".png",
-                        base + enemyKey + "_win.png");
-            }
-            if (battleOutcomeArtImage == null) {
-                battleOutcomeArtImage = readOptionalImage(base + "player_lose.png");
-            }
-        }
-    }
-
-    /** Fallback when {@code battle_hitbox.png} uses one flat color per button (no distinct RGB ids). */
-    private Rectangle[] detectBattleButtonBlobsImageSpace() {
-        if (battleHitboxImage == null) return null;
-
-        int w = battleHitboxImage.getWidth();
-        int h = battleHitboxImage.getHeight();
-        boolean[][] visited = new boolean[h][w];
-        java.util.ArrayList<Rectangle> parts = new java.util.ArrayList<>();
-
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                if (visited[y][x] || !isBattleHitboxBlobPixel(x, y)) continue;
-
-                int minX = x, maxX = x, minY = y, maxY = y;
-                java.util.ArrayDeque<Point> queue = new java.util.ArrayDeque<>();
-                queue.add(new Point(x, y));
-                visited[y][x] = true;
-
-                while (!queue.isEmpty()) {
-                    Point p = queue.removeFirst();
-                    int px = p.x;
-                    int py = p.y;
-
-                    if (px < minX) minX = px;
-                    if (px > maxX) maxX = px;
-                    if (py < minY) minY = py;
-                    if (py > maxY) maxY = py;
-
-                    int[][] dirs = {{1,0}, {-1,0}, {0,1}, {0,-1}};
-                    for (int[] d : dirs) {
-                        int nx = px + d[0];
-                        int ny = py + d[1];
-                        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-                        if (visited[ny][nx] || !isBattleHitboxBlobPixel(nx, ny)) continue;
-                        visited[ny][nx] = true;
-                        queue.add(new Point(nx, ny));
-                    }
-                }
-                parts.add(new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1));
-            }
+        if (fxHealRounds > 0) {
+            player.currentHP = Math.min(player.currentHP + fxHealAmt, player.maxHP);
+            fxHealRounds--;
         }
 
-        if (parts.size() < 5) return null;
-
-        parts.sort((a, b) -> {
-            int rowA = a.y / 20;
-            int rowB = b.y / 20;
-            if (rowA != rowB) return Integer.compare(rowA, rowB);
-            return Integer.compare(a.x, b.x);
-        });
-
-        if (parts.size() > 5) {
-            parts = new java.util.ArrayList<>(parts.subList(0, 5));
-        }
-        return parts.toArray(new Rectangle[0]);
-    }
-
-    private boolean isBattleHitboxBlobPixel(int x, int y) {
-        int argb = battleHitboxImage.getRGB(x, y);
-        int alpha = (argb >>> 24) & 0xFF;
-        if (alpha == 0) return false;
-        int r = (argb >>> 16) & 0xFF;
-        int g = (argb >>> 8) & 0xFF;
-        int b = argb & 0xFF;
-        return !(r > 245 && g > 245 && b > 245);
-    }
-
-    private void resolveBattle(BattleSystem.Move playerMove) {
-        BattleSystem.Move enemyMove   = BattleSystem.getRandomEnemyMove();
-        BattleSystem.BattleResult result = BattleSystem.resolve(playerMove, enemyMove);
-
-        playerMoveDisplay = BattleSystem.getMoveEmoji(playerMove);
-        enemyMoveDisplay  = BattleSystem.getMoveEmoji(enemyMove);
+        double dm = player.damageMultiplier;
+        if (fxEnergyRounds > 0) { dm *= 20; fxEnergyRounds--; }
 
         switch (result) {
             case PLAYER_WIN -> {
-                int dmg = (int) Math.max(1, (rand.nextInt(10) + 1) * player.damageMultiplier);
-                enemyCurrentHP = Math.max(0, enemyCurrentHP - dmg);
-                if (enemyCurrentHP <= 0) {
-                    battleMessage  = "You Win! Dealt " + dmg + " dmg - " + enemyName + " defeated!";
+                int dmg = (int) Math.max(1, (rand.nextInt(10)+1) * dm);
+                if (fxFullCounter) { dmg *= 2; fxFullCounter = false; }
+                fxUnoReverse = false;
+                enemyHP = Math.max(0, enemyHP - dmg);
+                if (enemyHP <= 0) {
+                    battleMsg = "You Win! Dealt " + dmg + " dmg — " + enemyName + " defeated!";
                     battleResolved = true;
                     enemyStats.markDefeated(pendingBattleEnemyColor);
-                    player.healPercent(0.20);
+                    grantRewards();
                 } else {
-                    battleMessage = "You Win! Dealt " + dmg + " damage to " + enemyName + ".";
+                    battleMsg = "You Win! Dealt " + dmg + " damage to " + enemyName + ".";
                 }
-                waitingForNext = true;
             }
             case ENEMY_WIN -> {
-                int dmg = (int) Math.max(1, (rand.nextInt(10) + 1) / player.damageMultiplier);
-                player.currentHP = Math.max(0, player.currentHP - dmg);
-                if (player.currentHP <= 0) {
-                    battleMessage  = "You Lose! Took " + dmg + " dmg - You were defeated! Respawning...";
-                    battleResolved = true;
+                int dmg = (int) Math.max(1, (rand.nextInt(10)+1) / Math.max(0.1, player.damageMultiplier));
+                if (isFinalBoss) dmg = (int)(dmg * 1.5);
+                if (fxUnoReverse || fxFullCounter) {
+                    int ref = fxFullCounter ? dmg*2 : dmg;
+                    fxUnoReverse = false; fxFullCounter = false;
+                    enemyHP = Math.max(0, enemyHP - ref);
+                    battleMsg = "Reflected " + ref + " damage back!";
+                    if (enemyHP <= 0) { battleMsg += " " + enemyName + " defeated!"; battleResolved = true; enemyStats.markDefeated(pendingBattleEnemyColor); grantRewards(); }
                 } else {
-                    battleMessage = "You Lose! Took " + dmg + " damage from " + enemyName + ".";
+                    player.currentHP = Math.max(0, player.currentHP - dmg);
+                    if (player.currentHP <= 0) { battleMsg = "You Lose! Took " + dmg + " dmg — Defeated!"; battleResolved = true; }
+                    else battleMsg = "You Lose! Took " + dmg + " damage from " + enemyName + ".";
                 }
-                waitingForNext = true;
             }
-            case DRAW -> {
-                battleMessage  = "Draw! No damage dealt.";
-                waitingForNext = true;
-            }
+            case DRAW -> battleMsg = "Draw! No damage dealt.";
         }
-        loadBattleOutcomeArt(playerMove, enemyMove);
+
+        String pp = pm.name().toLowerCase(), ep = em.name().toLowerCase();
+        outcomeRPSImg = img("/res/gui/pixelart/battle_outcome/" + pp + "_" + ep + ".png");
+        waitingOutcome = true;
+        gameState = outcomeState;
+    }
+
+    private void grantRewards() {
+        int ic = rand.nextInt(5) + 1;
+        for (int i=0;i<ic;i++) items.addRandom(rand);
+        int ac = rand.nextDouble() < 0.3 ? rand.nextInt(3)+1 : 1;
+        for (int i=0;i<ac;i++) abilities.addRandom(rand);
+        autoSave();
     }
 
     private void nextRound() {
+        gameState = battleState;
         if (battleResolved) {
             if (player.currentHP <= 0) {
                 player.respawnWithPenalty();
+                if (isFinalBoss) {
+                    loadMapImages(FRONTGATE_MAP);
+                    enemyStats.unmarkDefeated(COLOR_VAUGHN);
+                    gameState = playState;
+                    return;
+                }
             }
-            battleHoverZone = "";
-            gameState         = playState;
-            currentDialog     = "";
-            dialogStage       = 0;
-            lastNPCColor      = 0;
-            battleResolved    = false;
-            waitingForNext    = false;
-            battleOutcomeArtImage = null;
-            playerMoveDisplay = "";
-            enemyMoveDisplay  = "";
+            if (isFinalBoss && player.currentHP > 0) { gameState = winState; return; }
+            if (pendingBattleEnemyColor == COLOR_VAUGHN && player.currentHP > 0) {
+                startNarration(); return;
+            }
+            gameState = playState;
+            currentDialog = ""; dialogStage = 0; lastNPCColor = 0;
+            battleResolved = false; waitingOutcome = false;
+            playMusic(GLE_MAP.equals(currentMapName) ? "gle_soundtrack" : "frontgate_soundtrack");
+            autoSave();
         } else {
             battleRound++;
-            battleMessage     = "Round " + battleRound + " - Choose your move!";
-            playerMoveDisplay = "";
-            enemyMoveDisplay  = "";
-            waitingForNext    = false;
+            battleMsg = "Round " + battleRound + " - Choose your move!";
+            waitingOutcome = false;
         }
     }
 
-    public void startGameThread() {
-        gameThread = new Thread(this);
-        gameThread.start();
+    // ─────────────────────────────────────────────────────────────
+    //  NARRATION (post-Vaughn → final boss)
+    // ─────────────────────────────────────────────────────────────
+    private void startNarration() {
+        narrating = true; narIndex = 0; eWasNarHeld = false;
+        narLines = new String[]{
+            "Narration: \"After getting all your money back you proceed to emall to go buy your jollibee\"",
+            "Narration: \"not oh noo\"",
+            "Narration: \"a mysterious person approaches you\"",
+            "Mysterious person: \"Sir can you spare some change?\"",
+            "Player: \"I cant I'm so sorry\"",
+            "Mysterious person: \"No you have money I dont believe you I'll fight you for it\""
+        };
+        currentDialog = narLines[0];
+        loadMapImages(EMALL_MAP);
+        gameState = playState;
     }
+
+    // ─────────────────────────────────────────────────────────────
+    //  ITEMS / ABILITIES
+    // ─────────────────────────────────────────────────────────────
+    private void useItem(ItemSystem.Item item) {
+        items.remove(item);
+        switch (item) {
+            case WATER        -> player.currentHP = Math.min(player.currentHP + player.maxHP / 10, player.maxHP);
+            case BARNUTS      -> player.currentHP = Math.min(player.currentHP + 50, player.maxHP);
+            case GREENCROSS   -> { fxHealRounds = 10; fxHealAmt = 50; player.currentHP = Math.max(1, player.currentHP - 2); }
+            case COFFEE       -> player.maxHP += 10;
+            case ENERGY_DRINK -> fxEnergyRounds = 10;
+            case SLEEPING_MASK-> player.currentHP = player.maxHP;
+        }
+        abilMsg = "Used " + item.displayName + "!"; abilMsgTimer = 120;
+        gameState = prevStateBeforePanel;
+        autoSave();
+    }
+
+    private void useAbility(AbilitySystem.Ability ability) {
+        abilities.remove(ability);
+        switch (ability) {
+            case CLAIRVOYANCE -> {
+                BattleSystem.Move next = BattleSystem.getRandomEnemyMove();
+                clairText = enemyName + " will pick " + next.name() + " next turn";
+                clairVisible = true;
+            }
+            case UNO_REVERSE  -> fxUnoReverse  = true;
+            case HYPNOTIZE    -> fxHypnotize   = true;
+            case YOU_CHEATER  -> fxYouCheater  = true;
+            case FULL_COUNTER -> fxFullCounter = true;
+        }
+        abilMsg = "Used " + ability.displayName + "!"; abilMsgTimer = 120;
+        gameState = prevStateBeforePanel;
+        autoSave();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  GAME LOOP
+    // ─────────────────────────────────────────────────────────────
+    public void startGameThread() { gameThread = new Thread(this); gameThread.start(); }
 
     @Override
     public void run() {
-        double drawInterval = 1_000_000_000.0 / 60;
-        double delta   = 0;
-        long lastTime  = System.nanoTime();
-
+        double interval = 1_000_000_000.0 / 60;
+        double delta = 0; long last = System.nanoTime();
         while (gameThread != null) {
-            long currentTime = System.nanoTime();
-            delta    += (currentTime - lastTime) / drawInterval;
-            lastTime  = currentTime;
+            long now = System.nanoTime();
+            delta += (now - last) / interval; last = now;
+            if (delta >= 1) { update(); repaint(); delta--; }
+        }
+    }
 
-            if (delta >= 1) {
-                if (gameState == playState) {
-                    player.update();
-                    if (keyH.f1Pressed && !f1WasPressed) {
-                        showDebug = !showDebug; f1WasPressed = true; }
-                    if (!keyH.f1Pressed) f1WasPressed = false;
+    private void update() {
+        talkShake++;
+        if (abilMsgTimer > 0) abilMsgTimer--;
+        boolean escNow = keyH.escPressed;
+
+        if (escNow && !escWasHeld) {
+            if (settingsOpen) {
+                settingsOpen = false;
+            } else {
+                switch (gameState) {
+                    case playState -> {
+                        currentDialog = "";
+                        gameState = menuCharState;
+                        stopMusic();
+                        playMusic("menu_sountrack");
+                    }
+                    case menuCharState -> gameState = menuStartState;
+                    case menuStartState -> gameState = menuState;
+                    case creditsState -> gameState = menuState;
+                    case inventoryState -> gameState = (prevStateBeforePanel == battleState ? battleState : playState);
+                    case abilityState -> gameState = (prevStateBeforePanel == battleState ? battleState : playState);
+                    default -> { }
                 }
-                if (gameState == fadeState) updateFade();
-                if (keyH.escPressed && !escWasPressed) {
-                    handleEscapePressed();
-                    escWasPressed = true;
-                }
-                if (!keyH.escPressed) escWasPressed = false;
-                updateMenuFade();
-                updateBackgroundSoundtrack();
-                repaint();
-                delta--;
             }
         }
-    }
+        escWasHeld = escNow;
 
+        if (gameState == playState && player != null) {
+            player.update();
+            if (keyH.f1Pressed && !f1WasHeld) { showDebug = !showDebug; f1WasHeld = true; }
+            if (!keyH.f1Pressed) f1WasHeld = false;
 
-
-    private void handleEscapePressed() {
-        if (menuFadeActive) return;
-
-        if (gameState == characterSelectState) {
-            clearMenuHover();
-            startMenuFade(startMenuState);
-        } else if (gameState == startMenuState) {
-            clearMenuHover();
-            startMenuFade(titleState);
-        } else if (gameState == playState) {
-            currentDialog = "";
-            clearMenuHover();
-            startMenuFade(startMenuState);
-        }
-    }
-
-    public void drawNPCs(Graphics2D g2) {
-        if (!START_MAP.equals(currentMapName)) return;
-        if (hitboxImage == null) return;
-
-        HashMap<Integer, int[]> colorBounds = new HashMap<>();
-
-        for (int y = 0; y < hitboxImage.getHeight(); y++) {
-            for (int x = 0; x < hitboxImage.getWidth(); x++) {
-                int color = hitboxImage.getRGB(x, y) & 0xFFFFFF;
-                if (color != COLOR_JAMES && color != COLOR_ALIEYANDREW &&
-                        color != COLOR_KYLE && color != COLOR_JOHNRU && color != COLOR_ADRIAN) continue;
-
-                if (enemyStats.isDefeated(color)) continue;
-
-                if (!colorBounds.containsKey(color)) {
-                    colorBounds.put(color, new int[]{x, x, y, y});
+            // Narration advance
+            if (narrating && keyH.ePressed && !eWasNarHeld) {
+                eWasNarHeld = true;
+                narIndex++;
+                if (narIndex >= narLines.length) {
+                    narrating = false; currentDialog = "";
+                    pendingBattleEnemyColor = COLOR_FINALBOSS;
+                    startFadeToBlack();
                 } else {
-                    int[] b = colorBounds.get(color);
-                    if (x < b[0]) b[0] = x;
-                    if (x > b[1]) b[1] = x;
-                    if (y < b[2]) b[2] = y;
-                    if (y > b[3]) b[3] = y;
+                    currentDialog = narLines[narIndex];
                 }
             }
+            if (!keyH.ePressed) eWasNarHeld = false;
         }
-
-        for (int color : colorBounds.keySet()) {
-            int[] b = colorBounds.get(color);
-            int scaledTileSize = getScaledTileSize();
-
-            int centerX = (b[0] + b[1]) / 2;
-            int centerY = (b[2] + b[3]) / 2;
-
-            int screenX = (centerX * getWidth()) / hitboxImage.getWidth();
-            int screenY = (centerY * getHeight()) / hitboxImage.getHeight();
-
-            int drawX = screenX - (scaledTileSize / 2);
-            int drawY = screenY - (scaledTileSize / 2);
-
-            BufferedImage img = null;
-            if (color == COLOR_JAMES)       img = jamesStand;
-            if (color == COLOR_ALIEYANDREW) img = alieyandrewStand;
-            if (color == COLOR_KYLE)        img = kyleStand;
-            if (color == COLOR_JOHNRU)      img = johnruStand;
-            if (color == COLOR_ADRIAN)      img = adrianStand;
-
-            if (img != null) {
-                g2.setColor(new Color(0, 0, 0, 100));
-                int shadowWidth = (int)(scaledTileSize * 0.6);
-                int shadowHeight = (int)(scaledTileSize * 0.15);
-                int shadowX = drawX + (scaledTileSize - shadowWidth) / 2;
-
-                int shadowOffset = scaleUniform(15);
-                if (color == COLOR_KYLE || color == COLOR_JOHNRU) {
-                    shadowOffset = scaleUniform(25);
-                } else if (color == COLOR_JAMES) {
-                    shadowOffset = scaleUniform(20);
-                }
-
-                int shadowY = drawY + scaledTileSize - shadowHeight - shadowOffset;
-                g2.fillOval(shadowX, shadowY, shadowWidth, shadowHeight);
-
-                g2.drawImage(img, drawX, drawY, scaledTileSize, scaledTileSize, null);
-            }
+        if (gameState == fadeState) updateFade();
+        if (player != null && --autoSaveCountdown <= 0) {
+            autoSave();
+            autoSaveCountdown = AUTOSAVE_INTERVAL_FRAMES;
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    //  PAINT DISPATCH
+    // ─────────────────────────────────────────────────────────────
     @Override
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        if      (gameState == titleState)  drawTitleScreen(g2);
-        else if (gameState == startMenuState) drawStartMenuScreen(g2);
-        else if (gameState == characterSelectState) drawCharacterSelectScreen(g2);
-        else if (gameState == playState)   drawPlayState(g2);
-        else if (gameState == fadeState)   drawFadeState(g2);
-        else if (gameState == battleState) drawBattleState(g2);
-
-        drawMenuFade(g2);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,   RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,  RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        switch (gameState) {
+            case menuState      -> paintMenu(g2);
+            case menuStartState -> paintMenuStart(g2);
+            case menuCharState  -> paintCharSelect(g2);
+            case playState      -> paintPlay(g2);
+            case fadeState      -> paintFade(g2);
+            case battleState    -> paintBattle(g2);
+            case outcomeState   -> paintOutcome(g2);
+            case creditsState   -> paintCredits(g2);
+            case inventoryState -> paintInventory(g2);
+            case abilityState   -> paintAbility(g2);
+            case winState       -> paintWin(g2);
+        }
         g2.dispose();
     }
 
-    private void drawMenuFade(Graphics2D g2) {
-        if (!menuFadeActive || menuFadeAlpha <= 0f) return;
+    // ─────────────────────────────────────────────────────────────
+    //  DRAWING HELPERS
+    // ─────────────────────────────────────────────────────────────
+    private void fill(Graphics2D g2, BufferedImage im) {
+        if (im != null) g2.drawImage(im, 0, 0, getWidth(), getHeight(), null);
+    }
 
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, menuFadeAlpha));
+    /** Draw a button image (idle or hover) stretched to fill its hitbox color region */
+    private void drawBtn(Graphics2D g2, BufferedImage hb, int color, String key) {
+        if (hb == null) return;
+        BufferedImage[] arr = btnImgs.get(key);
+        if (arr == null) return;
+        boolean hov = key.equals(hoveredBtn);
+        BufferedImage bim = (hov && arr[1] != null) ? arr[1] : arr[0];
+        if (bim == null) return;
+        Rectangle r = bounds(hb, color);
+        if (r != null) g2.drawImage(bim, r.x, r.y, r.width, r.height, null);
+    }
+
+    // Cache bounds lookups — recomputed only when screen size changes
+    private final Map<Long, Rectangle> boundsCache = new HashMap<>();
+    private int cachedW = 0, cachedH = 0;
+
+    /** Compute screen-space bounding rectangle of all pixels of a given color in a hitbox image */
+    private Rectangle bounds(BufferedImage hb, int targetColor) {
+        if (hb == null) return null;
+        if (getWidth() != cachedW || getHeight() != cachedH) {
+            boundsCache.clear(); cachedW = getWidth(); cachedH = getHeight();
+        }
+        long key = ((long) System.identityHashCode(hb) << 32) | (targetColor & 0xFFFFFFFFL);
+        return boundsCache.computeIfAbsent(key, k -> computeBounds(hb, targetColor));
+    }
+
+    private Rectangle computeBounds(BufferedImage hb, int targetColor) {
+        int mnX=Integer.MAX_VALUE, mxX=0, mnY=Integer.MAX_VALUE, mxY=0; boolean f=false;
+        for (int y=0;y<hb.getHeight();y++) for (int x=0;x<hb.getWidth();x++) {
+            if ((hb.getRGB(x,y)&0xFFFFFF)==targetColor) {
+                if(x<mnX)mnX=x; if(x>mxX)mxX=x; if(y<mnY)mnY=y; if(y>mxY)mxY=y; f=true;
+            }
+        }
+        if (!f) return null;
+        int W=getWidth(), H=getHeight(), hw=hb.getWidth(), hh=hb.getHeight();
+        return new Rectangle(mnX*W/hw, mnY*H/hh, (mxX-mnX+1)*W/hw, (mxY-mnY+1)*H/hh);
+    }
+
+    private void hpBar(Graphics2D g2, int x, int y, int w, int h, int cur, int max, String lbl) {
+        g2.setColor(new Color(0,0,0,160));
+        g2.fillRoundRect(x-4,y-4,w+8,h+24,10,10);
+        g2.setColor(new Color(80,0,0));
+        g2.fillRoundRect(x,y+16,w,h,6,6);
+        float r = max>0 ? (float)cur/max : 0;
+        g2.setColor(r>.5f?new Color(60,200,80):r>.25f?new Color(230,180,0):new Color(220,50,50));
+        g2.fillRoundRect(x,y+16,(int)(w*r),h,6,6);
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial",Font.BOLD,16));
+        String txt = lbl.isEmpty() ? cur+"/"+max : lbl+"  "+cur+"/"+max;
+        g2.drawString(txt, x, y+14);
+    }
+
+    private void dialog(Graphics2D g2, String text) {
+        int bx=60, by=getHeight()-200, bw=getWidth()-120, bh=150;
+        g2.setColor(new Color(0,0,0,210)); g2.fillRoundRect(bx,by,bw,bh,25,25);
+        g2.setColor(Color.WHITE); g2.setStroke(new BasicStroke(3)); g2.drawRoundRect(bx,by,bw,bh,25,25);
+
+        // Portrait — stretched to fit #6377FF region in worldGuiHitbox if available,
+        // otherwise fall back to fixed position inside dialog box
+        BufferedImage port = null;
+        if (lastNPCColor != 0) {
+            String f = enemyFolder(lastNPCColor);
+            if (f != null) port = npcDialog.computeIfAbsent(f,
+                k -> img("/res/sprites/enemies/"+k+"/"+k+"_dialog.png"));
+        } else if (player != null) {
+            port = playerDialogImg;
+        }
+
+        if (port != null) {
+            // Try to draw in the BC_CHARDIAL hitbox region (world gui)
+            Rectangle dialR = (worldGuiHitbox != null) ? bounds(worldGuiHitbox, BC_CHARDIAL) : null;
+            if (dialR != null) {
+                g2.drawImage(port, dialR.x, dialR.y, dialR.width, dialR.height, null);
+            } else {
+                // Fallback: draw inside dialog box with shake
+                int shX = (talkShake%6<3)?2:-2;
+                g2.drawImage(port, bx+12+shX, by+(bh-110)/2, 80, 110, null);
+            }
+        }
+
+        g2.setFont(new Font("Arial",Font.BOLD,21)); g2.setColor(Color.WHITE);
+        int tx = (port != null && bounds(worldGuiHitbox, BC_CHARDIAL) == null) ? bx+110 : bx+20;
+        int ty=by+48, mw=bw - (tx - bx) - 20;
+        for (String ln : wrap(g2,text,mw)) { g2.drawString(ln,tx,ty); ty+=30; }
+        g2.setFont(new Font("Arial",Font.ITALIC,16)); g2.setColor(new Color(180,180,180));
+        g2.drawString("Press 'E' to continue...", bx+bw-260, by+bh-18);
+    }
+
+    // Cached dialog portraits (loaded once per NPC folder)
+    private final Map<String, BufferedImage> npcDialog = new HashMap<>();
+
+    private List<String> wrap(Graphics2D g2, String text, int maxW) {
+        List<String> out=new ArrayList<>();
+        if(text==null||text.isEmpty()) return out;
+        FontMetrics fm=g2.getFontMetrics();
+        for (String para : text.split("\n")) {
+            StringBuilder cur=new StringBuilder();
+            for (String w : para.split(" ")) {
+                String t=cur.length()==0?w:cur+" "+w;
+                if(fm.stringWidth(t)>maxW){if(cur.length()>0)out.add(cur.toString());cur=new StringBuilder(w);}
+                else cur=new StringBuilder(t);
+            }
+            if(cur.length()>0)out.add(cur.toString());
+        }
+        return out;
+    }
+
+    private void statCard(Graphics2D g2, CharacterStats.CharacterType ct) {
+        int cx=getWidth()-360,cy=280,cw=320,ch=220;
+        g2.setColor(new Color(20,20,50,230)); g2.fillRoundRect(cx,cy,cw,ch,20,20);
+        g2.setColor(new Color(150,150,255)); g2.setStroke(new BasicStroke(2)); g2.drawRoundRect(cx,cy,cw,ch,20,20);
+        int tx=cx+24,ty=cy+44,lh=42;
+        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,26)); g2.drawString(ct.displayName,tx,ty);
+        ty+=lh-8; g2.setColor(new Color(180,220,255)); g2.setFont(new Font("Arial",Font.ITALIC,19));
+        g2.drawString("\" "+ct.description+" \"",tx,ty);
+        ty+=lh; g2.setColor(new Color(100,255,120)); g2.setFont(new Font("Arial",Font.BOLD,22));
+        g2.drawString("HP:  "+ct.maxHP,tx,ty);
+        ty+=lh-4; g2.setColor(new Color(255,180,80));
+        g2.drawString(ct.damageMultiplier>=999?"DMG: 999 (Unlimited)":String.format("DMG: x%.1f",ct.damageMultiplier),tx,ty);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  MENU SCREENS
+    // ─────────────────────────────────────────────────────────────
+    private void paintMenu(Graphics2D g2) {
+        fill(g2, menuScreenImg);
+        // Logo (not a clickable button — just image)
+        if (logoImg != null) {
+            Rectangle lr = bounds(menuMainHitbox, BC_LOGO);
+            if (lr != null) g2.drawImage(logoImg, lr.x, lr.y, lr.width, lr.height, null);
+        }
+        drawBtn(g2, menuMainHitbox, BC_START,  "start");
+        drawBtn(g2, menuMainHitbox, BC_CREDIT, "credits");
+        drawBtn(g2, menuMainHitbox, BC_QUIT,   "quit");
+        drawMenuSettingsButton(g2);
+        if (settingsOpen) paintSettingsPanel(g2);
+    }
+
+    private void paintMenuStart(Graphics2D g2) {
+        fill(g2, menuScreenImg);
+        drawBtn(g2, menuStartHitbox, BC_CONTINUE, "continue");
+        drawBtn(g2, menuStartHitbox, BC_SELCHAR,  "selchar");
+        drawBtn(g2, menuStartHitbox, BC_SETTINGS, "settings");
+        if (settingsOpen) paintSettingsPanel(g2);
+    }
+
+    private void paintCharSelect(Graphics2D g2) {
+        fill(g2, menuScreenImg);
+
+        for (String name : List.of("ivan", "sam", "nimuel", "johnfiel")) {
+            BufferedImage[] arr = btnImgs.get(name);
+            Rectangle r = charButtonRect(name);
+            if (arr == null || r == null) continue;
+            BufferedImage img = name.equals(hoveredBtn) && arr[1] != null ? arr[1] : arr[0];
+            if (img != null) g2.drawImage(img, r.x, r.y, r.width, r.height, null);
+        }
+
+        String hcn = charName(hoveredCharColor);
+        if (hcn == null && hoveredBtn != null && charColor(hoveredBtn) != 0) hcn = hoveredBtn;
+
+        // Only show the character selection preview while hovering a character slot/button.
+        if (hcn != null) {
+            BufferedImage prev = charSelectImg.get(hcn);
+            Rectangle preview = charPreviewRect();
+            if (prev != null) {
+                // Keep aspect ratio and center it.
+                double ar = prev.getWidth() / (double) Math.max(1, prev.getHeight());
+                int th = preview.height;
+                int tw = Math.max(1, (int) Math.round(th * ar));
+                if (tw > preview.width) { tw = preview.width; th = Math.max(1, (int) Math.round(tw / ar)); }
+                int x = preview.x + (preview.width - tw) / 2;
+                int y = preview.y + (preview.height - th) / 2;
+                g2.drawImage(prev, x, y, tw, th, null);
+            }
+        }
+
+        // Intentionally no hover text overlay here (no "TANK/HP/DMG" labels).
+    }
+
+    private void drawOutlinedText(Graphics2D g2, String text, int centerX, int y, Font font) {
+        if (text == null || text.isEmpty()) return;
+        g2.setFont(font);
+        int w = g2.getFontMetrics().stringWidth(text);
+        int x = centerX - w / 2;
         g2.setColor(Color.BLACK);
-        g2.fillRect(0, 0, getWidth(), getHeight());
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-    }
-
-    private void drawTitleScreen(Graphics2D g2) {
-        drawMenuBase(g2);
-        drawMenuButton(g2, startBtn, startIdleImage, startHoverImage, "start");
-        drawMenuButton(g2, creditsBtn, creditsIdleImage, creditsHoverImage, "credits");
-        drawMenuButton(g2, quitBtn, quitIdleImage, quitHoverImage, "quit");
-        drawMenuIconButton(g2, muteBtn, muteIdleImage, muteHoverImage, "mute");
-        drawMenuIconButton(g2, settingsBtn, settingsIdleImage, settingsHoverImage, "settings");
-        drawMenuHoverOutline(g2, menuStartHitboxImage);
-    }
-
-    private void drawStartMenuScreen(Graphics2D g2) {
-        drawMenuBase(g2);
-        drawMenuButton(g2, continueMenuBtn, continueIdleImage, continueHoverImage, "continue");
-        drawMenuButton(g2, selectCharacterBtn, selectCharacterIdleImage, selectCharacterHoverImage, "selectCharacter");
-        drawMenuIconButton(g2, muteBtn, muteIdleImage, muteHoverImage, "mute");
-        drawMenuIconButton(g2, settingsBtn, settingsIdleImage, settingsHoverImage, "settings");
-        drawMenuHoverOutline(g2, menuGuiHitboxImage);
-    }
-
-    private void drawCharacterSelectScreen(Graphics2D g2) {
-        drawMenuBase(g2);
-        drawCharacterPreview(g2);
-        drawCharacterButton(g2, ivanBtn, 0);
-        drawCharacterButton(g2, samBtn, 2);
-        drawCharacterButton(g2, nimuelBtn, 1);
-        drawCharacterButton(g2, johnfielBtn, 3);
-        drawMenuIconButton(g2, muteBtn, muteIdleImage, muteHoverImage, "mute");
-        drawMenuIconButton(g2, settingsBtn, settingsIdleImage, settingsHoverImage, "settings");
-    }
-
-    private void drawCharacterPreview(Graphics2D g2) {
-        if (hoveredCharIndex < 0 || characterSelectImages == null) return;
-        if (hoveredCharIndex >= characterSelectImages.length) return;
-
-        BufferedImage image = characterSelectImages[hoveredCharIndex];
-        Rectangle sourceBounds = getNonTransparentBounds(image);
-        Rectangle screenBounds = getColorBounds(menuCharacterSelectHitboxImage, COLOR_CHAR_PREVIEW);
-
-        if (image == null || sourceBounds == null || screenBounds == null) return;
-
-        // Fit character art into the preview box while preserving aspect ratio.
-        double boxScale = 0.90;
-        int availableWidth = Math.max(1, (int) Math.round(screenBounds.width * boxScale));
-        int availableHeight = Math.max(1, (int) Math.round(screenBounds.height * boxScale));
-        double fitScale = Math.min((double) availableWidth / sourceBounds.width, (double) availableHeight / sourceBounds.height);
-        int targetWidth = Math.max(1, (int) Math.round(sourceBounds.width * fitScale));
-        int targetHeight = Math.max(1, (int) Math.round(sourceBounds.height * fitScale));
-        int targetX = screenBounds.x + (screenBounds.width - targetWidth) / 2;
-        int targetY = screenBounds.y + (screenBounds.height - targetHeight) / 2;
-
-        g2.drawImage(
-                image,
-                targetX,
-                targetY,
-                targetX + targetWidth,
-                targetY + targetHeight,
-                sourceBounds.x,
-                sourceBounds.y,
-                sourceBounds.x + sourceBounds.width,
-                sourceBounds.y + sourceBounds.height,
-                null
-        );
-    }
-
-    private void drawMenuBase(Graphics2D g2) {
-        drawMenuImage(g2, menuBackgroundImage);
-        drawBaseImage(g2, menuLogoImage, new Rectangle(160, 38, 180, 56));
-    }
-
-    private void drawMenuButton(Graphics2D g2, Rectangle bounds, BufferedImage idle, BufferedImage hover, String name) {
-        drawBaseImage(g2, name.equals(hoveredMenuButton) ? hover : idle, bounds);
-    }
-
-    private void drawMenuIconButton(Graphics2D g2, Rectangle bounds, BufferedImage idle, BufferedImage hover, String name) {
-        drawBaseImage(g2, name.equals(hoveredMenuButton) ? hover : idle, bounds);
-    }
-
-    private void drawCharacterButton(Graphics2D g2, Rectangle bounds, int index) {
-        if (characterButtonIdleImages == null || characterButtonHoverImages == null) return;
-        BufferedImage image = hoveredCharIndex == index ? characterButtonHoverImages[index] : characterButtonIdleImages[index];
-        int characterColor = getCharacterColorByIndex(index);
-        Rectangle screenBounds = getColorBounds(menuCharacterSelectHitboxImage, characterColor);
-
-        if (screenBounds != null) {
-            g2.drawImage(image, screenBounds.x, screenBounds.y, screenBounds.width, screenBounds.height, null);
-            return;
+        for (int oy = -3; oy <= 3; oy++) for (int ox = -3; ox <= 3; ox++) {
+            if (ox == 0 && oy == 0) continue;
+            if (Math.abs(ox) + Math.abs(oy) > 4) continue;
+            g2.drawString(text, x + ox, y + oy);
         }
-
-        // Fallback to fixed base rectangles if the hitbox color is missing.
-        drawBaseImage(g2, image, bounds);
-    }
-
-    private int getCharacterColorByIndex(int index) {
-        return switch (index) {
-            case 0 -> COLOR_CHAR_IVAN;
-            case 1 -> COLOR_CHAR_NIMUEL;
-            case 2 -> COLOR_CHAR_SAM;
-            case 3 -> COLOR_CHAR_JOHNFIEL;
-            default -> 0;
-        };
-    }
-
-    private void drawBaseImage(Graphics2D g2, BufferedImage image, Rectangle baseRect) {
-        if (image == null) return;
-        Rectangle screenRect = toScreenRect(baseRect);
-        g2.drawImage(image, screenRect.x, screenRect.y, screenRect.width, screenRect.height, null);
-    }
-
-    private void drawMenuImage(Graphics2D g2, BufferedImage image) {
-        if (image != null) {
-            g2.drawImage(image, 0, 0, getWidth(), getHeight(), null);
-        } else {
-            g2.setColor(Color.BLACK);
-            g2.fillRect(0, 0, getWidth(), getHeight());
-        }
-    }
-
-    private void drawMenuHoverOutline(Graphics2D g2, BufferedImage hitboxImage) {
-        if (hoveredMenuColor == 0) return;
-        if (gameState == characterSelectState) return;
-        if (hoveredMenuColor == COLOR_MENU_LOGO) return;
-        if ((menuMuteColor != 0 && hoveredMenuColor == menuMuteColor) ||
-                (menuSettingsColor != 0 && hoveredMenuColor == menuSettingsColor)) return;
-        Rectangle bounds = getColorBounds(hitboxImage, hoveredMenuColor);
-        if (bounds == null) return;
-
-        int pad = Math.max(2, scaleUniform(2));
         g2.setColor(Color.WHITE);
-        g2.setStroke(new BasicStroke(Math.max(2, scaleUniform(2))));
-        g2.drawRect(bounds.x - pad, bounds.y - pad, bounds.width + pad * 2, bounds.height + pad * 2);
+        g2.drawString(text, x, y);
     }
 
-    private void drawStatCard(Graphics2D g2, CharacterStats.CharacterType ct) {
-        int cardX = screenWidth / 2 - 200;
-        int cardY = 280;
-        int cardW = 320;
-        int cardH = 220;
-
-        g2.setColor(new Color(20, 20, 50, 230));
-        g2.fillRoundRect(cardX, cardY, cardW, cardH, 20, 20);
-        g2.setColor(new Color(150, 150, 255));
-        g2.setStroke(new BasicStroke(2));
-        g2.drawRoundRect(cardX, cardY, cardW, cardH, 20, 20);
-
-        int tx   = cardX + 24;
-        int ty   = cardY + 44;
-        int lineH = 42;
-
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("Arial", Font.BOLD, 26));
-        g2.drawString(ct.displayName, tx, ty);
-
-        ty += lineH - 8;
-        g2.setColor(new Color(180, 220, 255));
-        g2.setFont(new Font("Arial", Font.ITALIC, 20));
-        g2.drawString("\" " + ct.description + " \"", tx, ty);
-
-        ty += lineH;
-        g2.setColor(new Color(100, 255, 120));
-        g2.setFont(new Font("Arial", Font.BOLD, 22));
-        g2.drawString("HP:  " + ct.maxHP, tx, ty);
-
-        ty += lineH - 4;
-        g2.setColor(new Color(255, 180, 80));
-        String dmgText = ct.damageMultiplier >= 999
-                ? "DMG: 999 (Unlimited)"
-                : String.format("DMG: x%.1f multiplier", ct.damageMultiplier);
-        g2.drawString(dmgText, tx, ty);
-    }
-
-    private void drawPlayState(Graphics2D g2) {
-        if (mapImage != null) {
-            g2.drawImage(mapImage, 0, 0, getWidth(), getHeight(), null);
-        } else {
-            g2.setColor(Color.WHITE);
-            g2.fillRect(0, 0, getWidth(), getHeight());
+    private void paintCredits(Graphics2D g2) {
+        fill(g2, menuScreenImg);
+        g2.setColor(new Color(0,0,0,200)); g2.fillRect(0,0,getWidth(),getHeight());
+        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,48));
+        String t="CREDITS"; g2.drawString(t,getWidth()/2-g2.getFontMetrics().stringWidth(t)/2,100);
+        g2.setFont(new Font("Arial",Font.PLAIN,28));
+        int y=180;
+        for (String n : new String[]{"Developer Team","","Ivan","Nimuel","Sam","Johnfiel","","Press ESC to go back"}) {
+            g2.drawString(n,getWidth()/2-g2.getFontMetrics().stringWidth(n)/2,y); y+=44;
         }
+    }
 
-        drawNPCs(g2);
+    private void paintSettingsPanel(Graphics2D g2) {
+        Rectangle panel = settingsPanelRect();
+        int px = panel.x, py = panel.y, pw = panel.width, ph = panel.height;
+        g2.setColor(new Color(20,20,40,240)); g2.fillRoundRect(px,py,pw,ph,20,20);
+        g2.setColor(new Color(100,150,255)); g2.setStroke(new BasicStroke(2)); g2.drawRoundRect(px,py,pw,ph,20,20);
+        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,28));
+        g2.drawString("SETTINGS",px+140,py+50);
+        String mk = isMuted ? "wmuted" : "wmute";
+        BufferedImage[] ma = btnImgs.get(mk);
+        boolean hoverMute = settingsMuteRect().contains(mouse);
+        BufferedImage muteImg = (ma != null) ? ((hoverMute && ma[1] != null) ? ma[1] : ma[0]) : null;
+        if (muteImg != null) {
+            Rectangle muteRect = settingsMuteRect();
+            g2.drawImage(muteImg, muteRect.x, muteRect.y, muteRect.width, muteRect.height, null);
+        }
+        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.PLAIN,22));
+        g2.drawString(isMuted?"Unmute":"Mute",px+200,py+120);
+        g2.setFont(new Font("Arial",Font.ITALIC,16)); g2.setColor(new Color(180,180,180));
+        g2.drawString("Click outside the panel to dismiss",px+55,py+ph-18);
+    }
 
+    private void drawMenuSettingsButton(Graphics2D g2) {
+        BufferedImage[] imgs = btnImgs.get("settings");
+        if (imgs == null || imgs[0] == null) return;
+        Rectangle r = fixedMenuSettingsRect();
+        BufferedImage img = "settings".equals(hoveredBtn) && imgs[1] != null ? imgs[1] : imgs[0];
+        g2.drawImage(img, r.x, r.y, r.width, r.height, null);
+    }
+
+    private Rectangle fixedMenuSettingsRect() {
+        int x = 16 * getWidth() / 500;
+        int y = 309 * getHeight() / 342;
+        int w = Math.max(1, 62 * getWidth() / 500);
+        int h = Math.max(1, 22 * getHeight() / 342);
+        return new Rectangle(x, y, w, h);
+    }
+
+    private Rectangle settingsPanelRect() {
+        return new Rectangle(getWidth()/2-200, getHeight()/2-125, 400, 250);
+    }
+
+    private Rectangle settingsMuteRect() {
+        Rectangle panel = settingsPanelRect();
+        return new Rectangle(panel.x + 60, panel.y + 80, 120, 60);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  PLAY STATE
+    //  Layer order: gle.png > world_gui_hitbox > buttons/npcs on top
+    // ─────────────────────────────────────────────────────────────
+    private void paintPlay(Graphics2D g2) {
+        fill(g2, mapImage);
         if (showDebug && hitboxImage != null) {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
-            g2.drawImage(hitboxImage, 0, 0, getWidth(), getHeight(), null);
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+            fill(g2, hitboxImage);
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
         }
+        paintNPCs(g2);
+        if (player != null) player.draw(g2);
+        paintWorldGUI(g2);
+        if (!currentDialog.isEmpty()) dialog(g2, currentDialog);
+        if (settingsOpen) paintSettingsPanel(g2);
+    }
 
-        player.draw(g2);
-        drawHPBar(g2, 20, 20, 220, 22, player.currentHP, player.maxHP, player.characterName);
+    private void paintWorldGUI(Graphics2D g2) {
+        if (player != null) hpBar(g2, 20, 20, 220, 22, player.currentHP, player.maxHP, player.characterName);
+        if (worldGuiHitbox == null) return;
+        drawBtn(g2, worldGuiHitbox, BC_ITEMS,   "item_inv");
+        drawBtn(g2, worldGuiHitbox, BC_ABILINV, "abil_inv");
+        drawBtn(g2, worldGuiHitbox, BC_BACK,    "backmenu");
+        drawWorldSettingsButton(g2);
+        drawMapTitle(g2);
+    }
 
-        if (!currentDialog.isEmpty()) {
-            drawDialogBox(g2, currentDialog);
+    private void drawWorldSettingsButton(Graphics2D g2) {
+        BufferedImage[] arr = btnImgs.get("wset");
+        Rectangle r = settingsWorldRect();
+        if (arr == null || r == null) return;
+        BufferedImage img = ("wset".equals(hoveredBtn) && arr[1] != null) ? arr[1] : arr[0];
+        if (img != null) g2.drawImage(img, r.x, r.y, r.width, r.height, null);
+    }
+
+    private Rectangle settingsWorldRect() {
+        return bounds(worldGuiHitbox, BC_MUTE);
+    }
+
+    private void drawMapTitle(Graphics2D g2) {
+        if (mapTitleImg == null) return;
+        Rectangle itemRect = bounds(worldGuiHitbox, BC_ITEMS);
+        if (itemRect == null) return;
+        int targetH = Math.max(28, itemRect.height - 8);
+        int targetW = Math.max(1, mapTitleImg.getWidth() * targetH / Math.max(1, mapTitleImg.getHeight()));
+        int x = Math.max(260, itemRect.x - targetW - 20);
+        int y = itemRect.y + (itemRect.height - targetH) / 2;
+        g2.drawImage(mapTitleImg, x, y, targetW, targetH, null);
+    }
+
+    // NPC bounding box cache — recomputed only on map load
+    private Map<Integer,int[]> npcBoundsCache = new HashMap<>();
+    private String npcBoundsCacheMap = "";
+
+    private void paintNPCs(Graphics2D g2) {
+        if (hitboxImage == null) return;
+        // Rebuild cache only when map changes
+        if (!currentMapName.equals(npcBoundsCacheMap)) {
+            npcBoundsCache.clear();
+            npcBoundsCacheMap = currentMapName;
+            Set<Integer> npcColors = mapNPCColors();
+            for (int py=0;py<hitboxImage.getHeight();py++) for (int px=0;px<hitboxImage.getWidth();px++) {
+                int c = hitboxImage.getRGB(px,py)&0xFFFFFF;
+                if (!npcColors.contains(c)) continue;
+                int[] b = npcBoundsCache.get(c);
+                if (b == null) { b = new int[]{px,px,py,py}; npcBoundsCache.put(c,b); }
+                if(px<b[0])b[0]=px; if(px>b[1])b[1]=px; if(py<b[2])b[2]=py; if(py>b[3])b[3]=py;
+            }
         }
-
-        // Draw map name GUI
-        if (player != null) {
-            drawMapNameGUI(g2);
+        for (Map.Entry<Integer,int[]> e : npcBoundsCache.entrySet()) {
+            int c=e.getKey(); int[] b=e.getValue();
+            if (enemyStats.isDefeated(c)) continue;
+            if (c == COLOR_BROKENDOOR) continue; // broken door has no sprite
+            int sx=((b[0]+b[1])/2)*getWidth()/hitboxImage.getWidth();
+            int sy=((b[2]+b[3])/2)*getHeight()/hitboxImage.getHeight();
+            String f = enemyFolder(c); if (f==null) continue;
+            BufferedImage nim = npcStand.get(f);
+            if (nim!=null) {
+                int dx=sx-tileSize/2, dy=sy-tileSize/2;
+                g2.setColor(new Color(0,0,0,100));
+                int sw=(int)(tileSize*.6),sh=(int)(tileSize*.15);
+                g2.fillOval(dx+(tileSize-sw)/2, dy+tileSize-sh-15, sw, sh);
+                g2.drawImage(nim, dx, dy, tileSize, tileSize, null);
+            }
         }
     }
 
-    private void drawHPBar(Graphics2D g2, int x, int y, int w, int h, int current, int max, String label) {
-        drawHPBar(g2, x, y, w, h, current, max, label, Color.WHITE);
+    private Set<Integer> mapNPCColors() {
+        return HitboxColors.mapNpcColors(currentMapName);
     }
 
-    private void drawHPBar(Graphics2D g2, int x, int y, int w, int h, int current, int max, String label, Color labelColor) {
-        g2.setColor(new Color(0, 0, 0, 160));
-        g2.fillRoundRect(x - 4, y - 4, w + 8, h + 24, 10, 10);
-
-        g2.setColor(new Color(80, 0, 0));
-        g2.fillRoundRect(x, y + 16, w, h, 6, 6);
-
-        float ratio = max > 0 ? (float) current / max : 0f;
-        Color barColor = ratio > 0.5f ? new Color(60, 200, 80)
-                : ratio > 0.25f ? new Color(230, 180, 0)
-                : new Color(220, 50, 50);
-        g2.setColor(barColor);
-        g2.fillRoundRect(x, y + 16, (int)(w * ratio), h, 6, 6);
-
-        g2.setColor(labelColor);
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
-        g2.drawString(label + "  " + current + " / " + max, x, y + 14);
-    }
-
-    public int getScaledTileSize() {
-        if (getHeight() <= 0) {
-            return tileSize;
-        }
-
-        int baseScaledTileSize = Math.max(1, tileSize * getHeight() / 1080);
-        return Math.max(1, (int) Math.round(baseScaledTileSize * CHARACTER_SCALE_BOOST));
-    }
-
-    public int scaleUniform(int value) {
-        return Math.max(1, value * getScaledTileSize() / tileSize);
-    }
-
-    private void drawMapNameGUI(Graphics2D g2) {
-        if (mapTitleImage != null) {
-            int maxWidth = Math.max(1, getWidth() / 4);
-            int maxHeight = Math.max(1, getHeight() / 8);
-            int imageWidth = mapTitleImage.getWidth();
-            int imageHeight = mapTitleImage.getHeight();
-            double scale = Math.min((double) maxWidth / imageWidth, (double) maxHeight / imageHeight);
-            int drawWidth = Math.max(1, (int) Math.round(imageWidth * scale));
-            int drawHeight = Math.max(1, (int) Math.round(imageHeight * scale));
-            int bx = (getWidth() - drawWidth) / 2;
-            int by = scaleUniform(8);
-            g2.drawImage(mapTitleImage, bx, by, drawWidth, drawHeight, null);
-            return;
-        }
-
-        String label = currentMapName.toUpperCase();
-        int fontSize = scaleUniform(24);
-        g2.setFont(new Font("Arial", Font.BOLD, fontSize));
-        int textWidth = g2.getFontMetrics().stringWidth(label);
-        int padding = scaleUniform(12);
-        int boxWidth = textWidth + padding * 2;
-        int boxHeight = fontSize + padding;
-        int bx = (getWidth() - boxWidth) / 2;
-        int by = padding;
-
-        g2.setColor(new Color(0, 0, 0, 180));
-        g2.fillRoundRect(bx, by, boxWidth, boxHeight, scaleUniform(12), scaleUniform(12));
-        g2.setColor(Color.WHITE);
-        g2.setStroke(new BasicStroke(Math.max(1, scaleUniform(2))));
-        g2.drawRoundRect(bx, by, boxWidth, boxHeight, scaleUniform(12), scaleUniform(12));
-        g2.drawString(label, bx + padding, by + fontSize);
-    }
-
-    private void drawDialogBox(Graphics2D g2, String text) {
-        int bx = 100, by = getHeight() - 200, bw = getWidth() - 200, bh = 150;
-        g2.setColor(new Color(0, 0, 0, 200));
-        g2.fillRoundRect(bx, by, bw, bh, 25, 25);
-        g2.setColor(Color.WHITE);
-        g2.setStroke(new BasicStroke(3));
-        g2.drawRoundRect(bx, by, bw, bh, 25, 25);
-        g2.setFont(new Font("Arial", Font.BOLD, 26));
-        g2.drawString(text, bx + 40, by + 60);
-        g2.setFont(new Font("Arial", Font.ITALIC, 18));
-        g2.drawString("Press 'E' to continue...", getWidth() - 360, by + 120);
-    }
-
-    private void drawFadeState(Graphics2D g2) {
-        if (mapImage != null) {
-            g2.drawImage(mapImage, 0, 0, getWidth(), getHeight(), null);
-        } else {
-            g2.setColor(Color.WHITE);
-            g2.fillRect(0, 0, getWidth(), getHeight());
-        }
-
-        drawNPCs(g2);
-        player.draw(g2);
-
+    // ─────────────────────────────────────────────────────────────
+    //  FADE STATE
+    // ─────────────────────────────────────────────────────────────
+    private void paintFade(Graphics2D g2) {
+        fill(g2, mapImage);
+        paintNPCs(g2);
+        if (player != null) player.draw(g2);
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, fadeAlpha));
-        g2.setColor(Color.BLACK);
-        g2.fillRect(0, 0, getWidth(), getHeight());
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+        g2.setColor(Color.BLACK); g2.fillRect(0,0,getWidth(),getHeight());
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,1f));
     }
 
-    /** Background {@code gle_outcome.png}, outcome art in {@code COLOR_OUTCOME_ART_PANEL} region, continue on magenta. */
-    private void drawBattleOutcomeScreen(Graphics2D g2) {
-        if (outcomeSceneImage != null) {
-            g2.drawImage(outcomeSceneImage, 0, 0, getWidth(), getHeight(), null);
-        } else {
-            g2.setColor(new Color(15, 15, 35));
-            g2.fillRect(0, 0, getWidth(), getHeight());
-        }
-
-        Rectangle panel = outcomeHitboxImage != null
-                ? getColorBounds(outcomeHitboxImage, COLOR_OUTCOME_ART_PANEL)
-                : null;
-
-        if (battleOutcomeArtImage != null) {
-            if (panel != null && panel.width > 0 && panel.height > 0) {
-                drawImageFitInRect(g2, battleOutcomeArtImage, panel, false, null);
-            } else {
-                int margin = scaleUniform(24);
-                int reserveBottom = Math.max(scaleUniform(120), continueBtn != null ? continueBtn.height + margin * 3 : scaleUniform(96));
-                Rectangle fallback = new Rectangle(
-                        margin,
-                        margin,
-                        Math.max(1, getWidth() - 2 * margin),
-                        Math.max(1, getHeight() - reserveBottom));
-                drawImageFitInRect(g2, battleOutcomeArtImage, fallback, false, null);
+    // ─────────────────────────────────────────────────────────────
+    //  BATTLE STATE
+    //  Layer: battle_scene > battle_sprite_hitbox (sprites) > battle_hitbox (buttons) on top
+    //  HP: player top-left, round top-middle, enemy top-right
+    // ─────────────────────────────────────────────────────────────
+    private void paintBattle(Graphics2D g2) {
+        fill(g2, battleSceneImg);
+        // Sprites
+        if (battleSpriteHitbox != null) {
+            if (playerBattleImg != null) {
+                Rectangle r = bounds(battleSpriteHitbox, BC_PLRBAT);
+                if (r!=null) g2.drawImage(playerBattleImg, r.x, r.y, r.width, r.height, null);
+            }
+            if (enemyBattleImg != null) {
+                Rectangle r = bounds(battleSpriteHitbox, BC_ENMBAT);
+                if (r!=null) g2.drawImage(enemyBattleImg, r.x, r.y, r.width, r.height, null);
             }
         }
+        // HP bars
+        if (player != null) hpBar(g2, 40, 30, 300, 22, player.currentHP, player.maxHP, player.characterName);
+        // Round counter (top middle)
+        String rnd = "Round " + battleRound;
+        g2.setFont(new Font("Arial",Font.BOLD,28));
+        int rw=g2.getFontMetrics().stringWidth(rnd);
+        g2.setColor(new Color(0,0,0,150)); g2.fillRoundRect(getWidth()/2-rw/2-10,5,rw+20,38,10,10);
+        g2.setColor(new Color(255,220,80)); g2.drawString(rnd,getWidth()/2-rw/2,36);
+        if (!waitingOutcome) {
+            g2.setFont(new Font("Arial", Font.BOLD, 20));
+            int mw = g2.getFontMetrics().stringWidth(battleMsg);
+            g2.drawString(battleMsg, getWidth()/2 - mw/2, 66);
+        }
+        // Enemy HP
+        hpBar(g2, getWidth()-360, 30, 300, 22, enemyHP, enemyMaxHP, enemyName);
+        // Buttons (from battle_hitbox) — only show when player's turn
+        if (!waitingOutcome) {
+            drawBtn(g2, battleHitbox, BC_ROCKBTN,  "rock");
+            drawBtn(g2, battleHitbox, BC_PAPERBTN, "paper");
+            drawBtn(g2, battleHitbox, BC_SCISSBTN, "scissors");
+            drawBtn(g2, battleHitbox, BC_USEITEM,  "useitem");
+            drawBtn(g2, battleHitbox, BC_USEABIL,  "useabil");
+        }
+        // Active effects
+        int ey=90; g2.setFont(new Font("Arial",Font.BOLD,17));
+        for (String fx : activeEffects()) {
+            g2.setColor(new Color(80,255,180)); g2.drawString(fx,40,ey); ey+=24;
+        }
+        // Ability message
+        if (abilMsgTimer>0) {
+            g2.setFont(new Font("Arial",Font.BOLD,28));
+            g2.setColor(new Color(100,255,150));
+            int aw=g2.getFontMetrics().stringWidth(abilMsg);
+            g2.drawString(abilMsg, getWidth()/2-aw/2, getHeight()/2-40);
+        }
+        // Clairvoyance
+        if (clairVisible) dialog(g2, "Clairvoyance: " + clairText + " (click to dismiss)");
+    }
 
-        boolean contHover = "continue".equals(battleHoverZone);
-        BufferedImage ci = contHover && battleContinueHover != null ? battleContinueHover : battleContinueIdle;
-        if (ci != null && continueBtn != null && continueBtn.width > 0) {
-            drawImageFitInRect(g2, ci, continueBtn, false, null);
-        } else if (continueBtn != null && continueBtn.width > 0) {
-            String label = battleResolved ? "Back to Game" : "Continue";
-            g2.setColor(new Color(40, 120, 40));
-            g2.fillRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
-            g2.setColor(new Color(100, 255, 100));
-            g2.setStroke(new BasicStroke(2));
-            g2.drawRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
+    private List<String> activeEffects() {
+        List<String> out=new ArrayList<>();
+        if(fxUnoReverse)   out.add("Uno Reverse: ON");
+        if(fxHypnotize)    out.add("Hypnotize: ON");
+        if(fxYouCheater)   out.add("You Cheater: ON");
+        if(fxFullCounter)  out.add("Full Counter: ON");
+        if(fxHealRounds>0) out.add("Ticking Heal: "+fxHealRounds+" rounds");
+        if(fxEnergyRounds>0) out.add("Energy Drink: "+fxEnergyRounds+" rounds");
+        return out;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  OUTCOME STATE
+    //  Layer: outcome_scene > RPS image (BC_OUTCZONE region) > continue btn
+    // ─────────────────────────────────────────────────────────────
+    private void paintOutcome(Graphics2D g2) {
+        fill(g2, outcomeSceneImg);
+        if (outcomeRPSImg != null && outcomeHitbox != null) {
+            Rectangle r = bounds(outcomeHitbox, BC_OUTCZONE);
+            if (r!=null) g2.drawImage(outcomeRPSImg, r.x, r.y, r.width, r.height, null);
+        }
+        drawBtn(g2, outcomeHitbox, BC_CONTBAT, "contbat");
+        Rectangle continueRect = bounds(outcomeHitbox, BC_CONTBAT);
+        g2.setFont(new Font("Arial",Font.BOLD,28));
+        int my = continueRect != null ? continueRect.y + continueRect.height + 48 : getHeight()-120;
+        for (String ln : wrap(g2, battleMsg, getWidth()-200)) {
+            int lw=g2.getFontMetrics().stringWidth(ln);
+            g2.setColor(new Color(255,230,100)); g2.drawString(ln,getWidth()/2-lw/2,my); my+=36;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  INVENTORY / ABILITY
+    // ─────────────────────────────────────────────────────────────
+    private void paintInventory(Graphics2D g2) {
+        // Draw underlying state (battle or play)
+        if (prevStateBeforePanel == battleState) paintBattle(g2);
+        else paintPlay(g2);
+        int pw=520,ph=420,px=getWidth()/2-pw/2,py=getHeight()/2-ph/2;
+        panel(g2,px,py,pw,ph,"ITEMS");
+        List<ItemSystem.Item> list = items.getItems();
+        int iy=py+72; g2.setFont(new Font("Arial",Font.PLAIN,20));
+        for (ItemSystem.Item item : list) {
+            int cnt = items.count(item);
+            boolean h = new Rectangle(px+20,iy-28,pw-40,38).contains(mouse);
+            g2.setColor(h?new Color(90,90,180):new Color(40,40,100));
+            g2.fillRoundRect(px+20,iy-28,pw-40,38,8,8);
             g2.setColor(Color.WHITE);
-            g2.setFont(new Font("Arial", Font.BOLD, 24));
-            int lw = g2.getFontMetrics().stringWidth(label);
-            g2.drawString(label, continueBtn.x + continueBtn.width / 2 - lw / 2, continueBtn.y + 42);
+            g2.drawString("x"+cnt+"  "+item.displayName+" — "+item.description, px+34, iy);
+            iy+=48; if(iy>py+ph-44) break;
         }
-
-        if (!battleMessage.isEmpty()) {
-            int midX = getWidth() / 2;
-            g2.setFont(new Font("Arial", Font.BOLD, Math.min(28, scaleUniform(24))));
-            FontMetrics fm = g2.getFontMetrics();
-            int lineGap = scaleUniform(8);
-            int padBelowBtn = scaleUniform(16);
-            String[] lines = battleMessage.split("\n");
-
-            int msgStartY;
-            if (continueBtn != null && continueBtn.width > 0 && continueBtn.height > 0) {
-                msgStartY = continueBtn.y + continueBtn.height + padBelowBtn + fm.getAscent();
-            } else {
-                msgStartY = panel != null && panel.height > 0
-                        ? panel.y + panel.height + scaleUniform(28)
-                        : getHeight() / 2 + scaleUniform(40);
-            }
-
-            int msgY = msgStartY;
-            for (String line : lines) {
-                int lw = fm.stringWidth(line);
-                g2.setColor(new Color(255, 230, 100));
-                g2.drawString(line, midX - lw / 2, msgY);
-                msgY += fm.getHeight() + lineGap;
-            }
-        }
+        if (list.isEmpty()) { g2.setColor(new Color(180,180,180)); g2.setFont(new Font("Arial",Font.ITALIC,22)); g2.drawString("No items",px+pw/2-44,py+ph/2); }
+        g2.setColor(new Color(160,160,160)); g2.setFont(new Font("Arial",Font.ITALIC,15));
+        g2.drawString("Click item to use  |  ESC to close",px+32,py+ph-14);
     }
 
-    private void drawBattleState(Graphics2D g2) {
-        updateBattleButtons();
-
-        if (waitingForNext && outcomeHitboxImage != null) {
-            drawBattleOutcomeScreen(g2);
-            return;
-        }
-
-        if (battleSceneImage != null) {
-            g2.drawImage(battleSceneImage, 0, 0, getWidth(), getHeight(), null);
-        } else {
-            g2.setColor(new Color(15, 15, 35));
-            g2.fillRect(0, 0, getWidth(), getHeight());
-        }
-
-        if (battleSpriteHitboxImage != null) {
-            // getColorBounds() returns panel-space rects (same as battle_hitbox.png handling).
-            Rectangle playerSlot = getColorBounds(battleSpriteHitboxImage, COLOR_BATTLE_PLAYER_SLOT);
-            Rectangle enemySlot = getColorBounds(battleSpriteHitboxImage, COLOR_BATTLE_ENEMY_SLOT);
-            if (playerSlot != null && playerSlot.width > 0) {
-                drawBattleSpriteStretched(g2, battlePlayerImage, playerSlot, false, battlePlayerOpaqueBounds);
-            }
-            if (enemySlot != null && enemySlot.width > 0) {
-                drawBattleSpriteStretched(g2, battleEnemyImage, enemySlot, false, battleEnemyOpaqueBounds);
-            }
-        } else {
-            int battleSpriteY = getHeight() / 2 - 30;
-            drawBattleCharacter(g2, battlePlayerImage, getWidth() / 4, battleSpriteY, false, battlePlayerOpaqueBounds);
-            drawBattleCharacter(g2, battleEnemyImage, getWidth() * 3 / 4, battleSpriteY, false, battleEnemyOpaqueBounds);
-        }
-
-        int midX = getWidth() / 2;
-
-        int hpY = Math.max(8, scaleUniform(8));
-        int barW = Math.min(400, (getWidth() - 96) / 2);
-        int leftX = 24;
-        int rightX = getWidth() - 24 - barW;
-        drawHPBar(g2, leftX, hpY, barW, 22, player.currentHP, player.maxHP, player.characterName, Color.WHITE);
-        drawHPBar(g2, rightX, hpY, barW, 22, enemyCurrentHP, enemyMaxHP, enemyName, new Color(255, 120, 120));
-
-        int titleY = hpY + 52;
-        g2.setColor(new Color(220, 60, 60));
-        g2.setFont(new Font("Arial", Font.BOLD, 34));
-        String battleTitle = "BATTLE - Round " + battleRound;
-        int tw = g2.getFontMetrics().stringWidth(battleTitle);
-        g2.drawString(battleTitle, midX - tw / 2, titleY);
-
-        g2.setColor(new Color(255, 200, 50));
-        g2.setFont(new Font("Arial", Font.BOLD, 40));
-        FontMetrics vsFm = g2.getFontMetrics();
-        g2.drawString("VS", midX - vsFm.stringWidth("VS") / 2, titleY + 44);
-
-        int eHPx = rightX;
-
-        if (!playerMoveDisplay.isEmpty()) {
-            int boxY = 250, boxH = 100, boxW = 260;
-
-            g2.setColor(new Color(30, 80, 30));
-            g2.fillRoundRect(80, boxY, boxW, boxH, 14, 14);
-            g2.setColor(new Color(80, 200, 80));
-            g2.setStroke(new BasicStroke(2));
-            g2.drawRoundRect(80, boxY, boxW, boxH, 14, 14);
+    private void paintAbility(Graphics2D g2) {
+        if (prevStateBeforePanel == battleState) paintBattle(g2);
+        else paintPlay(g2);
+        int pw=540,ph=420,px=getWidth()/2-pw/2,py=getHeight()/2-ph/2;
+        panel(g2,px,py,pw,ph,"ABILITIES");
+        List<AbilitySystem.Ability> list = abilities.getAbilities();
+        int ay=py+72; g2.setFont(new Font("Arial",Font.PLAIN,20));
+        for (AbilitySystem.Ability ab : list) {
+            boolean h = new Rectangle(px+20,ay-28,pw-40,38).contains(mouse);
+            g2.setColor(h?new Color(90,90,180):new Color(40,40,100));
+            g2.fillRoundRect(px+20,ay-28,pw-40,38,8,8);
             g2.setColor(Color.WHITE);
-            g2.setFont(new Font("Arial", Font.BOLD, 28));
-            g2.drawString("You: " + playerMoveDisplay, 100, boxY + 60);
-
-            g2.setColor(new Color(80, 20, 20));
-            g2.fillRoundRect(eHPx, boxY, boxW, boxH, 14, 14);
-            g2.setColor(new Color(220, 80, 80));
-            g2.setStroke(new BasicStroke(2));
-            g2.drawRoundRect(eHPx, boxY, boxW, boxH, 14, 14);
-            g2.setColor(Color.WHITE);
-            g2.drawString(enemyName + ": " + enemyMoveDisplay, eHPx + 20, boxY + 60);
+            g2.drawString(ab.displayName+" — "+ab.description, px+34, ay);
+            ay+=48; if(ay>py+ph-44) break;
         }
-
-        int msgY = 400;
-        String[] lines = battleMessage.split("\n");
-        g2.setFont(new Font("Arial", Font.BOLD, 24));
-        for (String line : lines) {
-            int lw = g2.getFontMetrics().stringWidth(line);
-            g2.setColor(new Color(255, 230, 100));
-            g2.drawString(line, midX - lw / 2, msgY);
-            msgY += 36;
-        }
-
-        if (!waitingForNext) {
-            drawBattleWoodButton(g2, itemsBattleBtn, battleItemIdle, battleItemHover, "Items", "items".equals(battleHoverZone));
-            drawBattleWoodButton(g2, abilitiesBattleBtn, battleAbilityIdle, battleAbilityHover, "Abilities", "abilities".equals(battleHoverZone));
-            drawStretchedPickArt(g2, rockBtn, battleRockIdle, battleRockHover, "Rock", "rock".equals(battleHoverZone));
-            drawStretchedPickArt(g2, paperBtn, battlePaperIdle, battlePaperHover, "Paper", "paper".equals(battleHoverZone));
-            drawStretchedPickArt(g2, scissorsBtn, battleScissorsIdle, battleScissorsHover, "Scissors", "scissors".equals(battleHoverZone));
-        } else {
-            boolean contHover = "continue".equals(battleHoverZone);
-            BufferedImage ci = contHover && battleContinueHover != null ? battleContinueHover : battleContinueIdle;
-            if (ci != null && continueBtn.width > 0) {
-                drawImageFitInRect(g2, ci, continueBtn, false, null);
-            } else if (continueBtn.width > 0) {
-                String label = battleResolved ? "Back to Game" : "Next Round";
-                g2.setColor(new Color(40, 120, 40));
-                g2.fillRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
-                g2.setColor(new Color(100, 255, 100));
-                g2.setStroke(new BasicStroke(2));
-                g2.drawRoundRect(continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height, 14, 14);
-                g2.setColor(Color.WHITE);
-                g2.setFont(new Font("Arial", Font.BOLD, 24));
-                int lw = g2.getFontMetrics().stringWidth(label);
-                g2.drawString(label, continueBtn.x + continueBtn.width / 2 - lw / 2, continueBtn.y + 42);
-            }
-        }
+        if (list.isEmpty()) { g2.setColor(new Color(180,180,180)); g2.setFont(new Font("Arial",Font.ITALIC,22)); g2.drawString("No abilities",px+pw/2-55,py+ph/2); }
+        g2.setColor(new Color(160,160,160)); g2.setFont(new Font("Arial",Font.ITALIC,15));
+        g2.drawString("Click ability to use  |  ESC to close",px+32,py+ph-14);
     }
 
-    /**
-     * Draws {@code img} inside {@code dest} preserving aspect ratio (letterboxed), centered.
-     * Optional {@code srcCrop} limits the source to a sub-rectangle (e.g. non-transparent bounds).
-     */
-    private void drawImageFitInRect(Graphics2D g2, BufferedImage img, Rectangle dest, boolean flipHorizontal,
-                                    Rectangle srcCrop) {
-        if (img == null || dest == null || dest.width <= 0 || dest.height <= 0) return;
-
-        int sx0 = 0;
-        int sy0 = 0;
-        int sw = img.getWidth();
-        int sh = img.getHeight();
-        if (srcCrop != null && srcCrop.width > 0 && srcCrop.height > 0) {
-            sx0 = srcCrop.x;
-            sy0 = srcCrop.y;
-            sw = srcCrop.width;
-            sh = srcCrop.height;
-        }
-        if (sw <= 0 || sh <= 0) return;
-
-        double scale = Math.min((double) dest.width / sw, (double) dest.height / sh);
-        int dw = Math.max(1, (int) Math.round(sw * scale));
-        int dh = Math.max(1, (int) Math.round(sh * scale));
-        int dx = dest.x + (dest.width - dw) / 2;
-        int dy = dest.y + (dest.height - dh) / 2;
-
-        Object prevInterp = g2.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-        try {
-            if (!flipHorizontal) {
-                g2.drawImage(img, dx, dy, dx + dw, dy + dh, sx0, sy0, sx0 + sw, sy0 + sh, null);
-            } else {
-                AffineTransform old = g2.getTransform();
-                g2.translate(dx + dw, dy);
-                g2.scale(-1, 1);
-                g2.drawImage(img, 0, 0, dw, dh, sx0, sy0, sx0 + sw, sy0 + sh, null);
-                g2.setTransform(old);
-            }
-        } finally {
-            // getRenderingHint can return null; setRenderingHint(..., null) throws IllegalArgumentException.
-            if (prevInterp != null) {
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, prevInterp);
-            } else {
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            }
-        }
+    private void panel(Graphics2D g2, int px, int py, int pw, int ph, String title) {
+        g2.setColor(new Color(10,10,30,240)); g2.fillRoundRect(px,py,pw,ph,20,20);
+        g2.setColor(new Color(100,150,255)); g2.setStroke(new BasicStroke(2)); g2.drawRoundRect(px,py,pw,ph,20,20);
+        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,30));
+        g2.drawString(title, px+pw/2-g2.getFontMetrics().stringWidth(title)/2, py+44);
     }
 
-    /** Optional PNG from {@code battleButton/}; otherwise draws the wood-style label on the battle scene. */
-    private void drawBattleWoodButton(Graphics2D g2, Rectangle rect, BufferedImage idle, BufferedImage hover,
-                                      String label, boolean hovered) {
-        if (rect == null || rect.width <= 0) return;
-        BufferedImage img = hovered && hover != null ? hover : idle;
-        if (img != null) {
-            drawImageFitInRect(g2, img, rect, false, null);
-        } else {
-            drawMoveButton(g2, rect, label, BATTLE_BTN_WOOD_FILL, BATTLE_BTN_WOOD_BORDER);
+    // ─────────────────────────────────────────────────────────────
+    //  WIN SCREEN
+    // ─────────────────────────────────────────────────────────────
+    private void paintWin(Graphics2D g2) {
+        g2.setColor(Color.BLACK); g2.fillRect(0,0,getWidth(),getHeight());
+        if (player != null) { BufferedImage wi = charSelectImg.get(player.characterName); if(wi!=null) fill(g2,wi); }
+        g2.setColor(new Color(0,0,0,160)); g2.fillRect(0,getHeight()-200,getWidth(),200);
+        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,26));
+        String txt="After that weird encounter you finally get to enjoy your long awaited meal at Jollibee!!";
+        int ty=getHeight()-170;
+        for (String ln : wrap(g2,txt,getWidth()-80)) {
+            g2.drawString(ln,getWidth()/2-g2.getFontMetrics().stringWidth(ln)/2,ty); ty+=38;
         }
+        g2.setFont(new Font("Arial",Font.ITALIC,20)); g2.setColor(new Color(200,200,200));
+        String back="Press ESC to return to menu";
+        g2.drawString(back,getWidth()/2-g2.getFontMetrics().stringWidth(back)/2,getHeight()-55);
     }
 
-    private void drawStretchedPickArt(Graphics2D g2, Rectangle rect, BufferedImage idle, BufferedImage hover,
-                                      String fallbackLabel, boolean hovered) {
-        if (rect == null || rect.width <= 0) return;
-        BufferedImage img = hovered && hover != null ? hover : idle;
-        if (img != null) {
-            drawImageFitInRect(g2, img, rect, false, null);
-        } else {
-            drawMoveButton(g2, rect, fallbackLabel, BATTLE_BTN_WOOD_FILL, BATTLE_BTN_WOOD_BORDER);
-        }
+    // ─────────────────────────────────────────────────────────────
+    //  NPC interaction access (used by Player.java)
+    // ─────────────────────────────────────────────────────────────
+    public boolean isGleMap()       { return GLE_MAP.equals(currentMapName); }
+    public boolean isFrontgateMap() { return FRONTGATE_MAP.equals(currentMapName); }
+
+    /** Called by Player when Johnru or Vaughn is the miniboss and player tries to fight before clearing others */
+    public boolean allOtherGleEnemiesDefeated() {
+        return enemyStats.isDefeated(COLOR_JAMES) && enemyStats.isDefeated(COLOR_ALIEYANDREW)
+            && enemyStats.isDefeated(COLOR_KYLE)  && enemyStats.isDefeated(COLOR_ADRIAN);
     }
 
-    private void drawMoveButton(Graphics2D g2, Rectangle btn, String label, Color fill, Color border) {
-        g2.setColor(fill);
-        g2.fillRoundRect(btn.x, btn.y, btn.width, btn.height, 14, 14);
-        g2.setColor(border);
-        g2.setStroke(new BasicStroke(2));
-        g2.drawRoundRect(btn.x, btn.y, btn.width, btn.height, 14, 14);
-        g2.setColor(new Color(60, 42, 22));
-
-        int fontSize = Math.min(26, Math.max(14, btn.height / 2));
-        Font font = new Font("Arial", Font.BOLD, fontSize);
-        g2.setFont(font);
-        FontMetrics fm = g2.getFontMetrics();
-        while (fontSize > 12 && fm.stringWidth(label) > btn.width - 10) {
-            fontSize--;
-            font = new Font("Arial", Font.BOLD, fontSize);
-            g2.setFont(font);
-            fm = g2.getFontMetrics();
-        }
-        int lw = fm.stringWidth(label);
-        int textY = btn.y + (btn.height + fm.getAscent() - fm.getDescent()) / 2;
-        g2.drawString(label, btn.x + btn.width / 2 - lw / 2, textY);
-    }
-
-    private void drawBattleSpriteStretched(Graphics2D g2, BufferedImage sprite, Rectangle slot, boolean flipHorizontal,
-                                           Rectangle cachedOpaqueBounds) {
-        if (sprite == null || slot == null || slot.width <= 0 || slot.height <= 0) return;
-        Rectangle crop = cachedOpaqueBounds != null ? cachedOpaqueBounds : getNonTransparentBounds(sprite);
-        drawImageFitInRect(g2, sprite, slot, flipHorizontal, crop);
-    }
-
-    private void drawBattleCharacter(Graphics2D g2, BufferedImage sprite, int anchorX, int baselineY, boolean flip,
-                                     Rectangle cachedOpaqueBounds) {
-        if (sprite == null) return;
-
-        Rectangle spriteBounds = cachedOpaqueBounds != null ? cachedOpaqueBounds : getNonTransparentBounds(sprite);
-        if (spriteBounds == null) return;
-
-        int targetH = Math.max(scaleUniform(190), getHeight() / 3);
-        int targetW = Math.max(1, (int) (targetH * ((double) spriteBounds.width / Math.max(1, spriteBounds.height))));
-        int drawX = anchorX - targetW / 2;
-        int drawY = baselineY - targetH;
-
-        if (!flip) {
-            g2.drawImage(
-                    sprite,
-                    drawX, drawY, drawX + targetW, drawY + targetH,
-                    spriteBounds.x, spriteBounds.y, spriteBounds.x + spriteBounds.width, spriteBounds.y + spriteBounds.height,
-                    null
-            );
-        } else {
-            g2.drawImage(
-                    sprite,
-                    drawX + targetW, drawY, drawX, drawY + targetH,
-                    spriteBounds.x, spriteBounds.y, spriteBounds.x + spriteBounds.width, spriteBounds.y + spriteBounds.height,
-                    null
-            );
-        }
+    public boolean allOtherFrontgateEnemiesDefeated() {
+        return enemyStats.isDefeated(COLOR_DARRYLL) && enemyStats.isDefeated(COLOR_GIO)
+            && enemyStats.isDefeated(COLOR_YOHANN)  && enemyStats.isDefeated(COLOR_DIRK)
+            && enemyStats.isDefeated(COLOR_JAKE);
     }
 }
+
+
+
