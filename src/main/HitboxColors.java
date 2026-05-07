@@ -1,6 +1,7 @@
 package main;
 
 import java.util.Set;
+import main.HitboxColors.Ui;
 
 public final class HitboxColors {
 
@@ -42,7 +43,7 @@ public final class HitboxColors {
         public static final int COLOR_ADRIAN      = 0xB97A57;
         public static final int COLOR_NEXTAREA    = 0xED1C24;
         public static final int COLOR_BROKENDOOR  = 0xFF7F27;
-        public static final int COLOR_JAKE        = 0xC8BFE7;
+        public static final int COLOR_JAKE        = 0xC7BD7A;
         public static final int COLOR_DARRYLL     = 0xFFF848;
         public static final int COLOR_GIO         = 0x7D0000;
         public static final int COLOR_YOHANN      = 0x3C7D39;
