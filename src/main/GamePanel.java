@@ -655,20 +655,15 @@ public class GamePanel extends JPanel implements Runnable {
     //  CHARACTER SELECT
     // ─────────────────────────────────────────────────────────────
     public void selectChar(String name) {
-        // If the user picks the same character as the current save, continue the existing progress.
-        // If they pick a different character, reset everything back to a fresh run.
-        if (saveData != null && saveData.isForCharacter(name)) {
-            loadSave();
-            return;
-        }
-        enemyStats = new EnemyStats();
-        items      = new ItemSystem();
-        abilities  = new AbilitySystem();
-        player = new Player(this, keyH, name);
-        loadMapImages(GLE_MAP);
-        gameState = playState;
-        autoSave();
-    }
+    // Always start fresh — Continue button is for loading saves
+    enemyStats = new EnemyStats();
+    items      = new ItemSystem();
+    abilities  = new AbilitySystem();
+    player = new Player(this, keyH, name);
+    loadMapImages(GLE_MAP);
+    gameState = playState;
+    autoSave();
+}
 
     public void setPlayerSpawn() {
         if (hitboxImage == null || player == null) return;
