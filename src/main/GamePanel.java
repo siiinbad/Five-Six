@@ -970,16 +970,8 @@ public class GamePanel extends JPanel implements Runnable {
     private void useItem(ItemSystem.Item item) {
         boolean inBattle = prevStateBeforePanel == battleState;
 
-        // Healing items can only be used outside of battle
-        boolean isHealItem = switch (item) {
-            case WATER, BARNUTS, GREENCROSS, SLEEPING_MASK -> true;
-            default -> false;
-        };
-        if (inBattle && isHealItem) {
-            abilMsg = item.displayName + " can only be used outside battle!";
-            abilMsgTimer = 140;
-            return; // don't consume the item
-        }
+        // REMOVED: healing items were previously blocked in battle.
+        // All items including healing items are now usable during battle.
 
         items.remove(item);
         switch (item) {
@@ -1629,92 +1621,83 @@ public class GamePanel extends JPanel implements Runnable {
     //  INVENTORY / ABILITY
     // ─────────────────────────────────────────────────────────────
     private void paintInventory(Graphics2D g2) {
-        if (prevStateBeforePanel == battleState) {
-            paintBattle(g2);
-        } else {
-            fill(g2, mapImage);
-            g2.setColor(new Color(0,0,0,100));
-            g2.fillRect(0,0,getWidth(),getHeight());
-        }
-        boolean inBattle = prevStateBeforePanel == battleState;
-        int pw=520,ph=420,px=getWidth()/2-pw/2,py=getHeight()/2-ph/2;
-        panel(g2,px,py,pw,ph,"ITEMS");
-        List<ItemSystem.Item> list = items.getItems();
-        int iy=py+72; g2.setFont(new Font("Arial",Font.PLAIN,20));
-        for (ItemSystem.Item item : list) {
-            int cnt = items.count(item);
-            boolean isHeal = switch (item) {
-                case WATER, BARNUTS, GREENCROSS, SLEEPING_MASK -> true;
-                default -> false;
-            };
-            boolean locked = inBattle && isHeal;
-            boolean h = !locked && new Rectangle(px+20,iy-28,pw-40,38).contains(mouse);
-            g2.setColor(locked ? new Color(50,30,30) : (h ? new Color(90,90,180) : new Color(40,40,100)));
-            g2.fillRoundRect(px+20,iy-28,pw-40,38,8,8);
-            g2.setColor(locked ? new Color(110,80,80) : Color.WHITE);
-            g2.drawString("x"+cnt+"  "+item.displayName+" — "+item.description+(locked?" [battle only: locked]":""), px+34, iy);
-            iy+=48; if(iy>py+ph-44) break;
-        }
-        if (list.isEmpty()) { g2.setColor(new Color(180,180,180)); g2.setFont(new Font("Arial",Font.ITALIC,22)); g2.drawString("No items",px+pw/2-44,py+ph/2); }
-        g2.setColor(new Color(160,160,160)); g2.setFont(new Font("Arial",Font.ITALIC,15));
-        String hint = inBattle ? "Healing items locked in battle  |  ESC to close" : "Click item to use  |  ESC to close";
-        g2.drawString(hint, px+32, py+ph-14);
+    if (prevStateBeforePanel == battleState) {
+        paintBattle(g2);
+    } else {
+        paintPlay(g2);
+        g2.setColor(new Color(0,0,0,100));
+        g2.fillRect(0,0,getWidth(),getHeight());
     }
+    boolean inBattle = prevStateBeforePanel == battleState;
+    int pw=520,ph=420,px=getWidth()/2-pw/2,py=getHeight()/2-ph/2;
+    panel(g2,px,py,pw,ph,"ITEMS");
+    List<ItemSystem.Item> list = items.getItems();
+    int iy=py+72; g2.setFont(new Font("Arial",Font.PLAIN,20));
+    for (ItemSystem.Item item : list) {
+        int cnt = items.count(item);
+        boolean h = new Rectangle(px+20,iy-28,pw-40,38).contains(mouse);
+        g2.setColor(h ? new Color(90,90,180) : new Color(40,40,100));
+        g2.fillRoundRect(px+20,iy-28,pw-40,38,8,8);
+        g2.setColor(Color.WHITE);
+        g2.drawString("x"+cnt+"  "+item.displayName+" — "+item.description, px+34, iy);
+        iy+=48; if(iy>py+ph-44) break;
+    }
+    if (list.isEmpty()) { g2.setColor(new Color(180,180,180)); g2.setFont(new Font("Arial",Font.ITALIC,22)); g2.drawString("No items",px+pw/2-44,py+ph/2); }
+    g2.setColor(new Color(160,160,160)); g2.setFont(new Font("Arial",Font.ITALIC,15));
+    String hint = "Click item to use  |  ESC to close";
+    g2.drawString(hint, px+32, py+ph-14);
+}
 
     private void paintAbility(Graphics2D g2) {
-        if (prevStateBeforePanel == battleState) {
-            paintBattle(g2);
-        } else {
-            g2.setColor(new Color(20, 10, 50));
-            g2.fillRect(0, 0, getWidth(), getHeight());
-        }
-        boolean inBattle = prevStateBeforePanel == battleState;
-        int pw = 560, ph = 440, px = getWidth()/2 - pw/2, py = getHeight()/2 - ph/2;
-
-        // Panel box — bright border so it's clearly visible
-        g2.setColor(new Color(30, 25, 80));
-        g2.fillRoundRect(px, py, pw, ph, 18, 18);
-        g2.setColor(new Color(120, 180, 255));
-        g2.setStroke(new BasicStroke(3));
-        g2.drawRoundRect(px, py, pw, ph, 18, 18);
-
-        // Title
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("Arial", Font.BOLD, 28));
-        String title = "ABILITIES";
-        g2.drawString(title, px + pw/2 - g2.getFontMetrics().stringWidth(title)/2, py + 42);
-
-        // Divider
-        g2.setColor(new Color(80, 100, 200));
-        g2.setStroke(new BasicStroke(1));
-        g2.drawLine(px + 20, py + 54, px + pw - 20, py + 54);
-
-        // Rows
-        List<AbilitySystem.Ability> unique = abilities.getUnique();
-        int ay = py + 88;
-        g2.setFont(new Font("Arial", Font.PLAIN, 18));
-        for (AbilitySystem.Ability ab : unique) {
-            int cnt = abilities.count(ab);
-            boolean hovered = inBattle && new Rectangle(px+16, ay-26, pw-32, 36).contains(mouse);
-            g2.setColor(hovered ? new Color(80, 80, 200) : new Color(50, 45, 120));
-            g2.fillRoundRect(px+16, ay-26, pw-32, 36, 8, 8);
-            g2.setColor(inBattle ? Color.WHITE : new Color(190, 190, 190));
-            g2.drawString("x" + cnt + "  " + ab.displayName + " — " + ab.description, px + 28, ay);
-            ay += 46;
-            if (ay > py + ph - 40) break;
-        }
-        if (unique.isEmpty()) {
-            g2.setColor(new Color(160, 160, 160));
-            g2.setFont(new Font("Arial", Font.ITALIC, 20));
-            g2.drawString("No abilities", px + pw/2 - 55, py + ph/2);
-        }
-
-        // Footer
-        g2.setColor(new Color(130, 130, 130));
-        g2.setFont(new Font("Arial", Font.ITALIC, 14));
-        String hint = inBattle ? "Click an ability to use it  |  ESC to close" : "View only outside battle  |  ESC to close";
-        g2.drawString(hint, px + 20, py + ph - 12);
+    if (prevStateBeforePanel == battleState) {
+        paintBattle(g2);
+    } else {
+        paintPlay(g2);
+        g2.setColor(new Color(0,0,0,100));
+        g2.fillRect(0,0,getWidth(),getHeight());
     }
+    boolean inBattle = prevStateBeforePanel == battleState;
+    int pw = 560, ph = 440, px = getWidth()/2 - pw/2, py = getHeight()/2 - ph/2;
+
+    g2.setColor(new Color(30, 25, 80));
+    g2.fillRoundRect(px, py, pw, ph, 18, 18);
+    g2.setColor(new Color(120, 180, 255));
+    g2.setStroke(new BasicStroke(3));
+    g2.drawRoundRect(px, py, pw, ph, 18, 18);
+
+    g2.setColor(Color.WHITE);
+    g2.setFont(new Font("Arial", Font.BOLD, 28));
+    String title = "ABILITIES";
+    g2.drawString(title, px + pw/2 - g2.getFontMetrics().stringWidth(title)/2, py + 42);
+
+    g2.setColor(new Color(80, 100, 200));
+    g2.setStroke(new BasicStroke(1));
+    g2.drawLine(px + 20, py + 54, px + pw - 20, py + 54);
+
+    List<AbilitySystem.Ability> unique = abilities.getUnique();
+    int ay = py + 88;
+    g2.setFont(new Font("Arial", Font.PLAIN, 18));
+    for (AbilitySystem.Ability ab : unique) {
+        int cnt = abilities.count(ab);
+        boolean hovered = inBattle && new Rectangle(px+16, ay-26, pw-32, 36).contains(mouse);
+        g2.setColor(hovered ? new Color(80, 80, 200) : new Color(50, 45, 120));
+        g2.fillRoundRect(px+16, ay-26, pw-32, 36, 8, 8);
+        g2.setColor(inBattle ? Color.WHITE : new Color(190, 190, 190));
+        g2.drawString("x" + cnt + "  " + ab.displayName + " — " + ab.description, px + 28, ay);
+        ay += 46;
+        if (ay > py + ph - 40) break;
+    }
+    if (unique.isEmpty()) {
+        g2.setColor(new Color(160, 160, 160));
+        g2.setFont(new Font("Arial", Font.ITALIC, 20));
+        g2.drawString("No abilities", px + pw/2 - 55, py + ph/2);
+    }
+
+    g2.setColor(new Color(130, 130, 130));
+    g2.setFont(new Font("Arial", Font.ITALIC, 14));
+    String hint = inBattle ? "Click an ability to use it  |  ESC to close" : "View only outside battle  |  ESC to close";
+    g2.drawString(hint, px + 20, py + ph - 12);
+}
 
     private void panel(Graphics2D g2, int px, int py, int pw, int ph, String title) {
         g2.setColor(new Color(10,10,30,240)); g2.fillRoundRect(px,py,pw,ph,20,20);

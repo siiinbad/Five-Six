@@ -90,30 +90,45 @@ public class Player extends Entity {
     }
 
     private void checkInteractions() {
-        nearInteractable = false;
-        if (gp.hitboxImage == null) return;
-        Rectangle playerBox = getPlayerCollisionBox(x, y);
-        Rectangle interactBox = getInteractionBox(playerBox);
-        int color = findInteractionColor(interactBox);
-        if (color == 0) color = findInteractionColor(playerBox);
+    nearInteractable = false;
+    if (gp.hitboxImage == null) return;
+    Rectangle playerBox = getPlayerCollisionBox(x, y);
+    Rectangle interactBox = getInteractionBox(playerBox);
+    int color = findInteractionColor(interactBox);
+    if (color == 0) color = findInteractionColor(playerBox);
 
-        boolean interactable = isNPCColor(color) || color==COLOR_NEXTAREA;
-        if (isNPCColor(color) && gp.enemyStats.isDefeated(color)) {
-            gp.currentDialog=""; return;
-        }
-        if (!interactable) {
-            if (!gp.currentDialog.isEmpty()) { gp.currentDialog=""; gp.dialogStage=0; gp.lastNPCColor=0; }
-            return;
-        }
-        nearInteractable = true;
-        if (gp.lastNPCColor != color) { gp.dialogStage=0; gp.lastNPCColor=color; }
+    boolean interactable = isNPCColor(color) || color == COLOR_NEXTAREA;
+    if (isNPCColor(color) && gp.enemyStats.isDefeated(color)) {
+        gp.currentDialog = ""; return;
+    }
+    if (!interactable) {
+        if (!gp.currentDialog.isEmpty()) { gp.currentDialog = ""; gp.dialogStage = 0; gp.lastNPCColor = 0; }
+        return;
+    }
+    nearInteractable = true;
+    if (gp.lastNPCColor != color) { gp.dialogStage = 0; gp.lastNPCColor = color; }
 
-        if (keyH.ePressed && !eWasPressed) {
-            eWasPressed = true;
+    if (keyH.ePressed && !eWasPressed) {
+        eWasPressed = true;
+        if (!gp.currentDialog.isEmpty()) {
+            // Dismiss warning dialogs (Johnru/Vaughn gate, broken door, etc.)
+            boolean isWarning = (color == COLOR_JOHNRU && !gp.allOtherGleEnemiesDefeated())
+                             || (color == COLOR_VAUGHN && !gp.allOtherFrontgateEnemiesDefeated())
+                             || (color == COLOR_BROKENDOOR)
+                             || (color == COLOR_NEXTAREA);
+            if (isWarning) {
+                gp.currentDialog = "";
+                gp.dialogStage = 0;
+                gp.lastNPCColor = 0;
+            } else {
+                handleInteract(color);
+            }
+        } else {
             handleInteract(color);
         }
-        if (!keyH.ePressed) eWasPressed = false;
     }
+    if (!keyH.ePressed) eWasPressed = false;
+}
 
     private Rectangle getPlayerCollisionBox(int px, int py) {
         return new Rectangle(px + 45, py + 40, 70, gp.tileSize - 60);
