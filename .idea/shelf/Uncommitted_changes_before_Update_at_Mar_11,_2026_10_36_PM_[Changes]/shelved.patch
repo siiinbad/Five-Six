@@ -1,0 +1,674 @@
+Index: src/main/GamePanel.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package main;\r\n\r\nimport entity.Player;\r\nimport java.awt.*;\r\nimport java.awt.event.MouseAdapter;\r\nimport java.awt.event.MouseEvent;\r\nimport java.awt.image.BufferedImage;\r\nimport java.io.IOException;\r\nimport java.util.Objects;\r\nimport javax.imageio.ImageIO;\r\nimport javax.swing.JPanel;\r\n\r\npublic class GamePanel extends JPanel implements Runnable {\r\n  final int originalTileSize = 16;\r\n  final int scale = 10;\r\n  public final int tileSize = originalTileSize * scale;\r\n  final int maxScreenCol = 16;\r\n  final int maxScreenRow = 12;\r\n  int screenWidth = tileSize * maxScreenCol;\r\n  int screenHeight = tileSize * maxScreenRow;\r\n\r\n  int fps = 60;\r\n  KeyHandler keyH = new KeyHandler(this);\r\n  Thread gameThread;\r\n  public Player player;\r\n  BufferedImage mapImage;\r\n  BufferedImage menuImage; // Placeholder for menu image\r\n\r\n  public int gameState;\r\n  public final int titleState = 0;\r\n  public final int playState = 1;\r\n\r\n  Rectangle ivanBtn, nimuelBtn, samBtn, johnBtn;\r\n\r\n  public GamePanel() {\r\n    this.setPreferredSize(new Dimension(screenWidth, screenHeight));\r\n    this.setBackground(Color.black);\r\n    this.setDoubleBuffered(true);\r\n    this.addKeyListener(keyH);\r\n    this.setFocusable(true);\r\n\r\n    gameState = titleState;\r\n    loadImages();\r\n    initButtons();\r\n\r\n    this.addMouseListener(new MouseAdapter() {\r\n      @Override\r\n      public void mousePressed(MouseEvent e) {\r\n        if (gameState == titleState) {\r\n          if (ivanBtn.contains(e.getPoint())) selectChar(\"ivan\");\r\n          else if (nimuelBtn.contains(e.getPoint())) selectChar(\"nimuel\");\r\n          else if (samBtn.contains(e.getPoint())) selectChar(\"sam\");\r\n          else if (johnBtn.contains(e.getPoint())) selectChar(\"john\");\r\n        }\r\n      }\r\n    });\r\n  }\r\n\r\n  private void initButtons() {\r\n    int btnW = 300;\r\n    int btnH = 60;\r\n    int centerX = screenWidth / 2 - btnW / 2;\r\n\r\n    ivanBtn = new Rectangle(centerX, 300, btnW, btnH);\r\n    nimuelBtn = new Rectangle(centerX, 400, btnW, btnH);\r\n    samBtn = new Rectangle(centerX, 500, btnW, btnH);\r\n    johnBtn = new Rectangle(centerX, 600, btnW, btnH);\r\n  }\r\n\r\n  private void loadImages() {\r\n    try {\r\n      mapImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(\"/res/sprites/map/gle.png\")));\r\n    } catch (Exception e) {\r\n      System.out.println(\"Image loading failed, using color placeholders.\");\r\n    }\r\n  }\r\n\r\n  private void selectChar(String name) {\r\n    player = new Player(this, keyH, name);\r\n    gameState = playState;\r\n  }\r\n\r\n  public void startGameThread() {\r\n    gameThread = new Thread(this);\r\n    gameThread.start();\r\n  }\r\n\r\n  @Override\r\n  public void run() {\r\n    double drawInterval = 1000000000 / fps;\r\n    double delta = 0;\r\n    long lastTime = System.nanoTime();\r\n    while (gameThread != null) {\r\n      long currentTime = System.nanoTime();\r\n      delta += (currentTime - lastTime) / drawInterval;\r\n      lastTime = currentTime;\r\n      if (delta >= 1) {\r\n        update();\r\n        repaint();\r\n        delta--;\r\n      }\r\n    }\r\n  }\r\n\r\n  public void update() {\r\n    if (gameState == playState) {\r\n      player.update();\r\n      // Return to menu if ESC is pressed\r\n      if (keyH.escPressed) {\r\n        gameState = titleState;\r\n      }\r\n    }\r\n  }\r\n\r\n  @Override\r\n  public void paintComponent(Graphics g) {\r\n    super.paintComponent(g);\r\n    Graphics2D g2 = (Graphics2D) g;\r\n\r\n    if (gameState == titleState) {\r\n      drawMenu(g2);\r\n    } else if (gameState == playState) {\r\n      if (mapImage != null) {\r\n        g2.drawImage(mapImage, 0, 0, getWidth(), getHeight(), null);\r\n      } else {\r\n        g2.setColor(Color.DARK_GRAY);\r\n        g2.fillRect(0, 0, getWidth(), getHeight());\r\n      }\r\n      player.draw(g2);\r\n\r\n      // Visual indicator for returning to menu\r\n      g2.setColor(Color.WHITE);\r\n      g2.setFont(new Font(\"Arial\", Font.PLAIN, 20));\r\n      g2.drawString(\"ESC to Menu\", 20, 30);\r\n    }\r\n    g2.dispose();\r\n  }\r\n\r\n  private void drawMenu(Graphics2D g2) {\r\n    if (menuImage != null) {\r\n      g2.drawImage(menuImage, 0, 0, getWidth(), getHeight(), null);\r\n    } else {\r\n      g2.setColor(new Color(50, 50, 80));\r\n      g2.fillRect(0, 0, getWidth(), getHeight());\r\n    }\r\n\r\n    g2.setColor(Color.WHITE);\r\n    g2.setFont(new Font(\"Arial\", Font.BOLD, 50));\r\n    g2.drawString(\"CHARACTER SELECT\", getWidth()/2 - 250, 150);\r\n\r\n    drawBtn(g2, \"IVAN\", ivanBtn);\r\n    drawBtn(g2, \"NIMUEL\", nimuelBtn);\r\n    drawBtn(g2, \"SAM\", samBtn);\r\n    drawBtn(g2,  \"JOHN\", johnBtn);\r\n  }\r\n\r\n  private void drawBtn(Graphics2D g2, String text, Rectangle r) {\r\n    g2.setColor(Color.WHITE);\r\n    g2.draw(r);\r\n    g2.setFont(new Font(\"Arial\", Font.BOLD, 30));\r\n    FontMetrics fm = g2.getFontMetrics();\r\n    int textX = r.x + (r.width - fm.stringWidth(text)) / 2;\r\n    int textY = r.y + (r.height - fm.getHeight()) / 2 + fm.getAscent();\r\n    g2.drawString(text, textX, textY);\r\n  }\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/GamePanel.java b/src/main/GamePanel.java
+--- a/src/main/GamePanel.java	(revision bf97c5699999abb261ad1bc69a866e8794cdf842)
++++ b/src/main/GamePanel.java	(date 1773239645888)
+@@ -5,162 +5,220 @@
+ import java.awt.event.MouseAdapter;
+ import java.awt.event.MouseEvent;
+ import java.awt.image.BufferedImage;
+-import java.io.IOException;
+ import java.util.Objects;
+ import javax.imageio.ImageIO;
+ import javax.swing.JPanel;
++import panels.SelectCharacter;
+ 
+ public class GamePanel extends JPanel implements Runnable {
+-  final int originalTileSize = 16;
+-  final int scale = 10;
+-  public final int tileSize = originalTileSize * scale;
+-  final int maxScreenCol = 16;
+-  final int maxScreenRow = 12;
+-  int screenWidth = tileSize * maxScreenCol;
+-  int screenHeight = tileSize * maxScreenRow;
++
++    // Tiles
++    final int originalTileSize = 16;
++    final int scale = 10;
++    public final int tileSize = originalTileSize * scale;
++    final int maxScreenCol = 16;
++    final int maxScreenRow = 12;
++    public int screenWidth = tileSize * maxScreenCol;
++    int screenHeight = tileSize * maxScreenRow;
+ 
+-  int fps = 60;
+-  KeyHandler keyH = new KeyHandler(this);
+-  Thread gameThread;
+-  public Player player;
+-  BufferedImage mapImage;
+-  BufferedImage menuImage; // Placeholder for menu image
++    int fps = 60;
++    public KeyHandler keyH = new KeyHandler(this);
++    Thread gameThread;
++    public Player player;
++
++    BufferedImage mapImage;
+ 
+-  public int gameState;
+-  public final int titleState = 0;
+-  public final int playState = 1;
++    // Game states
++    public int gameState;
++    public final int loadingState = 0;
++    public final int titleState = 1;
++    public final int charSelectState = 2;
++    public final int playState = 3;
++    public final int libraryState = 4;
+ 
+-  Rectangle ivanBtn, nimuelBtn, samBtn, johnBtn;
++    // Menu buttons
++    Rectangle startBtn, selectCharBtn, libraryBtn, exitBtn;
++
++    // Character select screen
++    SelectCharacter charSelect;
+ 
+-  public GamePanel() {
+-    this.setPreferredSize(new Dimension(screenWidth, screenHeight));
+-    this.setBackground(Color.black);
+-    this.setDoubleBuffered(true);
+-    this.addKeyListener(keyH);
+-    this.setFocusable(true);
++    public GamePanel() {
++        this.setPreferredSize(new Dimension(screenWidth, screenHeight));
++        this.setBackground(Color.black);
++        this.setDoubleBuffered(true);
++        this.addKeyListener(keyH);
++        this.setFocusable(true);
+ 
+-    gameState = titleState;
+-    loadImages();
+-    initButtons();
++        gameState = loadingState;
++
++        loadImages();
++        initMenuButtons();
+ 
+-    this.addMouseListener(new MouseAdapter() {
+-      @Override
+-      public void mousePressed(MouseEvent e) {
+-        if (gameState == titleState) {
+-          if (ivanBtn.contains(e.getPoint())) selectChar("ivan");
+-          else if (nimuelBtn.contains(e.getPoint())) selectChar("nimuel");
+-          else if (samBtn.contains(e.getPoint())) selectChar("sam");
+-          else if (johnBtn.contains(e.getPoint())) selectChar("john");
+-        }
+-      }
+-    });
+-  }
++        // Character select screen
++        charSelect = new SelectCharacter(this);
++
++        // Menu buttons mouse listener
++        this.addMouseListener(new MouseAdapter() {
++            @Override
++            public void mousePressed(MouseEvent e) {
++                if (gameState == titleState) handleMenuClick(e.getPoint());
++            }
++        });
+ 
+-  private void initButtons() {
+-    int btnW = 300;
+-    int btnH = 60;
+-    int centerX = screenWidth / 2 - btnW / 2;
+-
+-    ivanBtn = new Rectangle(centerX, 300, btnW, btnH);
+-    nimuelBtn = new Rectangle(centerX, 400, btnW, btnH);
+-    samBtn = new Rectangle(centerX, 500, btnW, btnH);
+-    johnBtn = new Rectangle(centerX, 600, btnW, btnH);
+-  }
++        // Simulate loading screen delay
++        new Thread(() -> {
++            try { Thread.sleep(2000); } catch (InterruptedException e) {}
++            gameState = titleState;
++        }).start();
++    }
+ 
+-  private void loadImages() {
+-    try {
+-      mapImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/gle.png")));
+-    } catch (Exception e) {
+-      System.out.println("Image loading failed, using color placeholders.");
+-    }
+-  }
++    private void loadImages() {
++        try {
++            mapImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/res/sprites/map/gle.png")));
++        } catch (Exception e) {
++            System.out.println("Map image failed to load, using placeholder.");
++        }
++    }
+ 
+-  private void selectChar(String name) {
+-    player = new Player(this, keyH, name);
+-    gameState = playState;
+-  }
++    private void initMenuButtons() {
++        int btnW = 300, btnH = 60;
++        int centerX = screenWidth / 2 - btnW / 2;
++
++        startBtn = new Rectangle(centerX, 250, btnW, btnH);
++        selectCharBtn = new Rectangle(centerX, 350, btnW, btnH);
++        libraryBtn = new Rectangle(centerX, 450, btnW, btnH);
++        exitBtn = new Rectangle(centerX, 550, btnW, btnH);
++    }
++
++    private void handleMenuClick(Point p) {
++        if (startBtn.contains(p)) {
++            player = new Player(this, keyH, "ivan"); // default
++            gameState = playState;
++        } else if (selectCharBtn.contains(p)) {
++            gameState = charSelectState;
++        } else if (libraryBtn.contains(p)) {
++            gameState = libraryState;
++        } else if (exitBtn.contains(p)) {
++            System.exit(0);
++        }
++    }
+ 
+-  public void startGameThread() {
+-    gameThread = new Thread(this);
+-    gameThread.start();
+-  }
++    public void startGameThread() {
++        gameThread = new Thread(this);
++        gameThread.start();
++    }
+ 
+-  @Override
+-  public void run() {
+-    double drawInterval = 1000000000 / fps;
+-    double delta = 0;
+-    long lastTime = System.nanoTime();
+-    while (gameThread != null) {
+-      long currentTime = System.nanoTime();
+-      delta += (currentTime - lastTime) / drawInterval;
+-      lastTime = currentTime;
+-      if (delta >= 1) {
+-        update();
+-        repaint();
+-        delta--;
+-      }
+-    }
+-  }
++    @Override
++    public void run() {
++        double drawInterval = 1000000000.0 / fps;
++        double delta = 0;
++        long lastTime = System.nanoTime();
++
++        while (gameThread != null) {
++            long currentTime = System.nanoTime();
++            delta += (currentTime - lastTime) / drawInterval;
++            lastTime = currentTime;
++            if (delta >= 1) {
++                update();
++                repaint();
++                delta--;
++            }
++        }
++    }
+ 
+-  public void update() {
+-    if (gameState == playState) {
+-      player.update();
+-      // Return to menu if ESC is pressed
+-      if (keyH.escPressed) {
+-        gameState = titleState;
+-      }
+-    }
+-  }
++    public void update() {
++        if (gameState == playState && player != null) {
++            player.update();
++            if (keyH.escPressed) gameState = titleState;
++        }
++        if (gameState == charSelectState) {
++            if (keyH.escPressed) gameState = titleState;
++        }
++        if (gameState == libraryState) {
++            if (keyH.escPressed) gameState = titleState;
++        }
++    }
+ 
+-  @Override
+-  public void paintComponent(Graphics g) {
+-    super.paintComponent(g);
+-    Graphics2D g2 = (Graphics2D) g;
++    @Override
++    public void paintComponent(Graphics g) {
++        super.paintComponent(g);
++        Graphics2D g2 = (Graphics2D) g;
+ 
+-    if (gameState == titleState) {
+-      drawMenu(g2);
+-    } else if (gameState == playState) {
+-      if (mapImage != null) {
+-        g2.drawImage(mapImage, 0, 0, getWidth(), getHeight(), null);
+-      } else {
+-        g2.setColor(Color.DARK_GRAY);
+-        g2.fillRect(0, 0, getWidth(), getHeight());
+-      }
+-      player.draw(g2);
++        switch (gameState) {
++            case loadingState -> drawLoading(g2);
++            case titleState -> drawMenu(g2);
++            case charSelectState -> charSelect.draw(g2);
++            case playState -> drawGame(g2);
++            case libraryState -> drawLibrary(g2);
++        }
++
++        g2.dispose();
++    }
++
++    private void drawLoading(Graphics2D g2) {
++        g2.setColor(Color.BLACK);
++        g2.fillRect(0,0,getWidth(),getHeight());
++        g2.setColor(Color.WHITE);
++        g2.setFont(new Font("Arial", Font.BOLD, 50));
++        g2.drawString("LOADING...", getWidth()/2 - 150, getHeight()/2);
++    }
++
++    private void drawMenu(Graphics2D g2) {
++        g2.setColor(new Color(50,50,80));
++        g2.fillRect(0,0,getWidth(),getHeight());
++
++        g2.setColor(Color.WHITE);
++        g2.setFont(new Font("Arial", Font.BOLD, 50));
++        g2.drawString("MAIN MENU", getWidth()/2 - 150, 150);
++
++        drawBtn(g2, "START GAME", startBtn);
++        drawBtn(g2, "SELECT CHARACTER", selectCharBtn);
++        drawBtn(g2, "LIBRARY", libraryBtn);
++        drawBtn(g2, "EXIT", exitBtn);
++    }
++
++    private void drawGame(Graphics2D g2) {
++        if (mapImage != null) g2.drawImage(mapImage, 0, 0, getWidth(), getHeight(), null);
++        else {
++            g2.setColor(Color.DARK_GRAY);
++            g2.fillRect(0,0,getWidth(),getHeight());
++        }
+ 
+-      // Visual indicator for returning to menu
+-      g2.setColor(Color.WHITE);
+-      g2.setFont(new Font("Arial", Font.PLAIN, 20));
+-      g2.drawString("ESC to Menu", 20, 30);
++        if (player != null) player.draw(g2);
++
++        g2.setColor(Color.WHITE);
++        g2.setFont(new Font("Arial", Font.PLAIN, 20));
++        g2.drawString("ESC to Menu", 20,30);
+     }
+-    g2.dispose();
+-  }
+ 
+-  private void drawMenu(Graphics2D g2) {
+-    if (menuImage != null) {
+-      g2.drawImage(menuImage, 0, 0, getWidth(), getHeight(), null);
+-    } else {
+-      g2.setColor(new Color(50, 50, 80));
+-      g2.fillRect(0, 0, getWidth(), getHeight());
+-    }
++    private void drawLibrary(Graphics2D g2) {
++        g2.setColor(new Color(30,30,30));
++        g2.fillRect(0,0,getWidth(),getHeight());
+ 
+-    g2.setColor(Color.WHITE);
+-    g2.setFont(new Font("Arial", Font.BOLD, 50));
+-    g2.drawString("CHARACTER SELECT", getWidth()/2 - 250, 150);
++        g2.setColor(Color.WHITE);
++        g2.setFont(new Font("Arial", Font.BOLD, 50));
++        g2.drawString("LIBRARY", getWidth()/2 - 120, 120);
++
++        g2.setFont(new Font("Arial", Font.PLAIN, 28));
++        g2.drawString("Items:", 200, 250);
++        g2.drawString("- Sword : +10 Attack", 200, 300);
++        g2.drawString("- Shield : +15 Defense", 200, 340);
+ 
+-    drawBtn(g2, "IVAN", ivanBtn);
+-    drawBtn(g2, "NIMUEL", nimuelBtn);
+-    drawBtn(g2, "SAM", samBtn);
+-    drawBtn(g2,  "JOHN", johnBtn);
+-  }
++        g2.drawString("Skills:", 200, 420);
++        g2.drawString("- Fireball : 20 Mana", 200, 470);
++        g2.drawString("- Heal : Restore HP", 200, 510);
++
++        g2.setFont(new Font("Arial", Font.PLAIN, 20));
++        g2.drawString("Press ESC to return to menu", 20, 40);
++    }
+ 
+-  private void drawBtn(Graphics2D g2, String text, Rectangle r) {
+-    g2.setColor(Color.WHITE);
+-    g2.draw(r);
+-    g2.setFont(new Font("Arial", Font.BOLD, 30));
+-    FontMetrics fm = g2.getFontMetrics();
+-    int textX = r.x + (r.width - fm.stringWidth(text)) / 2;
+-    int textY = r.y + (r.height - fm.getHeight()) / 2 + fm.getAscent();
+-    g2.drawString(text, textX, textY);
+-  }
++    private void drawBtn(Graphics2D g2, String text, Rectangle r) {
++        g2.setColor(Color.WHITE);
++        g2.draw(r);
++        g2.setFont(new Font("Arial", Font.BOLD, 30));
++        FontMetrics fm = g2.getFontMetrics();
++        int textX = r.x + (r.width - fm.stringWidth(text))/2;
++        int textY = r.y + (r.height - fm.getHeight())/2 + fm.getAscent();
++        g2.drawString(text, textX, textY);
++    }
+ }
+\ No newline at end of file
+Index: src/Main.java
+===================================================================
+diff --git a/src/Main.java b/src/Main.java
+deleted file mode 100644
+--- a/src/Main.java	(revision bf97c5699999abb261ad1bc69a866e8794cdf842)
++++ /dev/null	(revision bf97c5699999abb261ad1bc69a866e8794cdf842)
+@@ -1,13 +0,0 @@
+-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
+-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
+-void main() {
+-    //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
+-    // to see how IntelliJ IDEA suggests fixing it.
+-    IO.println(String.format("Hello and welcome!"));
+-
+-    for (int i = 1; i <= 5; i++) {
+-        //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
+-        // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
+-        IO.println("i = " + i);
+-    }
+-}
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"AutoImportSettings\">\r\n    <option name=\"autoReloadType\" value=\"SELECTIVE\" />\r\n  </component>\r\n  <component name=\"ChangeListManager\">\r\n    <list default=\"true\" id=\"cd9c1dde-a7ae-4c7a-bb23-47cad8824edf\" name=\"Changes\" comment=\"\">\r\n      <change beforePath=\"$PROJECT_DIR$/.idea/workspace.xml\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/.idea/workspace.xml\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/src/main/GamePanel.java\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/src/main/GamePanel.java\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/src/res/sprites/ivan/ivan_front_stand.png\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/src/res/sprites/ivan/ivan_front_stand.png\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_stand.png\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_stand.png\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_walk2.png\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_walk2.png\" afterDir=\"false\" />\r\n    </list>\r\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\r\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\r\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\r\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\r\n  </component>\r\n  <component name=\"FileTemplateManagerImpl\">\r\n    <option name=\"RECENT_TEMPLATES\">\r\n      <list>\r\n        <option value=\"Class\" />\r\n      </list>\r\n    </option>\r\n  </component>\r\n  <component name=\"Git.Settings\">\r\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\r\n  </component>\r\n  <component name=\"GitHubPullRequestSearchHistory\">{\r\n  &quot;lastFilter&quot;: {\r\n    &quot;state&quot;: &quot;OPEN&quot;,\r\n    &quot;assignee&quot;: &quot;Ban-exe&quot;\r\n  }\r\n}</component>\r\n  <component name=\"GithubPullRequestsUISettings\">{\r\n  &quot;selectedUrlAndAccountId&quot;: {\r\n    &quot;url&quot;: &quot;https://github.com/siiinbad/Five-Six&quot;,\r\n    &quot;accountId&quot;: &quot;2afa242e-bd22-489b-ae22-3834c9f8febe&quot;\r\n  }\r\n}</component>\r\n  <component name=\"ProjectColorInfo\">{\r\n  &quot;associatedIndex&quot;: 2\r\n}</component>\r\n  <component name=\"ProjectId\" id=\"3AdIAfmu8oe7ZlGE3vCWLWqGCva\" />\r\n  <component name=\"ProjectViewState\">\r\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\r\n    <option name=\"showLibraryContents\" value=\"true\" />\r\n  </component>\r\n  <component name=\"PropertiesComponent\"><![CDATA[{\r\n  \"keyToString\": {\r\n    \"Application.Main.executor\": \"Run\",\r\n    \"ModuleVcsDetector.initialDetectionPerformed\": \"true\",\r\n    \"RunOnceActivity.ShowReadmeOnStart\": \"true\",\r\n    \"RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252\": \"true\",\r\n    \"RunOnceActivity.git.unshallow\": \"true\",\r\n    \"com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1\": \"true\",\r\n    \"git-widget-placeholder\": \"main\",\r\n    \"junie.onboarding.icon.badge.shown\": \"true\",\r\n    \"kotlin-language-version-configured\": \"true\",\r\n    \"onboarding.tips.debug.path\": \"C:/Users/Ivan/IdeaProjects/Five-Six/src/Main.java\",\r\n    \"project.structure.last.edited\": \"Modules\",\r\n    \"project.structure.proportion\": \"0.15\",\r\n    \"project.structure.side.proportion\": \"0.2\",\r\n    \"to.speed.mode.migration.done\": \"true\"\r\n  }\r\n}]]></component>\r\n  <component name=\"RecentsManager\">\r\n    <key name=\"CreateClassDialog.RecentsKey\">\r\n      <recent name=\"entity\" />\r\n    </key>\r\n    <key name=\"MoveFile.RECENT_KEYS\">\r\n      <recent name=\"C:\\Users\\Nimuel\\IdeaProjects\\five6\\src\\main\" />\r\n      <recent name=\"C:\\Users\\Nimuel\\IdeaProjects\\five6\\src\\entity\" />\r\n      <recent name=\"C:\\Users\\Nimuel\\IdeaProjects\\five6\\src\\res\" />\r\n    </key>\r\n  </component>\r\n  <component name=\"RunManager\">\r\n    <configuration name=\"Main\" type=\"Application\" factoryName=\"Application\" temporary=\"true\" nameIsGenerated=\"true\">\r\n      <option name=\"MAIN_CLASS_NAME\" value=\"main.Main\" />\r\n      <module name=\"Five-Six\" />\r\n      <extension name=\"coverage\">\r\n        <pattern>\r\n          <option name=\"PATTERN\" value=\"main.*\" />\r\n          <option name=\"ENABLED\" value=\"true\" />\r\n        </pattern>\r\n      </extension>\r\n      <method v=\"2\">\r\n        <option name=\"Make\" enabled=\"true\" />\r\n      </method>\r\n    </configuration>\r\n    <recent_temporary>\r\n      <list>\r\n        <item itemvalue=\"Application.Main\" />\r\n      </list>\r\n    </recent_temporary>\r\n  </component>\r\n  <component name=\"SharedIndexes\">\r\n    <attachedChunks>\r\n      <set>\r\n        <option value=\"bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26199.169\" />\r\n      </set>\r\n    </attachedChunks>\r\n  </component>\r\n  <component name=\"TaskManager\">\r\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\r\n      <changelist id=\"cd9c1dde-a7ae-4c7a-bb23-47cad8824edf\" name=\"Changes\" comment=\"\" />\r\n      <created>1772915913970</created>\r\n      <option name=\"number\" value=\"Default\" />\r\n      <option name=\"presentableId\" value=\"Default\" />\r\n      <updated>1772915913970</updated>\r\n    </task>\r\n    <servers />\r\n  </component>\r\n  <component name=\"XDebuggerManager\">\r\n    <breakpoint-manager>\r\n      <breakpoints>\r\n        <line-breakpoint enabled=\"true\" type=\"java-line\">\r\n          <url>file://$PROJECT_DIR$/src/Main.java</url>\r\n          <line>10</line>\r\n          <option name=\"timeStamp\" value=\"1\" />\r\n        </line-breakpoint>\r\n      </breakpoints>\r\n    </breakpoint-manager>\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision bf97c5699999abb261ad1bc69a866e8794cdf842)
++++ b/.idea/workspace.xml	(date 1773239708088)
+@@ -4,12 +4,12 @@
+     <option name="autoReloadType" value="SELECTIVE" />
+   </component>
+   <component name="ChangeListManager">
+-    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="">
++    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="add john button">
++      <change afterPath="$PROJECT_DIR$/src/panels/MenuPage.java" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/src/panels/SelectCharacter.java" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/src/Main.java" beforeDir="false" />
+       <change beforePath="$PROJECT_DIR$/src/main/GamePanel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/GamePanel.java" afterDir="false" />
+-      <change beforePath="$PROJECT_DIR$/src/res/sprites/ivan/ivan_front_stand.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/ivan/ivan_front_stand.png" afterDir="false" />
+-      <change beforePath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_stand.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_stand.png" afterDir="false" />
+-      <change beforePath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_walk2.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/res/sprites/nimuel/nimuel_front_walk2.png" afterDir="false" />
+     </list>
+     <option name="SHOW_DIALOG" value="false" />
+     <option name="HIGHLIGHT_CONFLICTS" value="true" />
+@@ -34,7 +34,7 @@
+ }</component>
+   <component name="GithubPullRequestsUISettings">{
+   &quot;selectedUrlAndAccountId&quot;: {
+-    &quot;url&quot;: &quot;https://github.com/siiinbad/Five-Six&quot;,
++    &quot;url&quot;: &quot;https://github.com/kiezzyy/Five-Six&quot;,
+     &quot;accountId&quot;: &quot;2afa242e-bd22-489b-ae22-3834c9f8febe&quot;
+   }
+ }</component>
+@@ -54,7 +54,7 @@
+     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+     "RunOnceActivity.git.unshallow": "true",
+     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+-    "git-widget-placeholder": "main",
++    "git-widget-placeholder": "Merging main",
+     "junie.onboarding.icon.badge.shown": "true",
+     "kotlin-language-version-configured": "true",
+     "onboarding.tips.debug.path": "C:/Users/Ivan/IdeaProjects/Five-Six/src/Main.java",
+@@ -109,17 +109,19 @@
+       <option name="presentableId" value="Default" />
+       <updated>1772915913970</updated>
+     </task>
++    <task id="LOCAL-00001" summary="add john button">
++      <option name="closed" value="true" />
++      <created>1773236161154</created>
++      <option name="number" value="00001" />
++      <option name="presentableId" value="LOCAL-00001" />
++      <option name="project" value="LOCAL" />
++      <updated>1773236161154</updated>
++    </task>
++    <option name="localTasksCounter" value="2" />
+     <servers />
+   </component>
+-  <component name="XDebuggerManager">
+-    <breakpoint-manager>
+-      <breakpoints>
+-        <line-breakpoint enabled="true" type="java-line">
+-          <url>file://$PROJECT_DIR$/src/Main.java</url>
+-          <line>10</line>
+-          <option name="timeStamp" value="1" />
+-        </line-breakpoint>
+-      </breakpoints>
+-    </breakpoint-manager>
++  <component name="VcsManagerConfiguration">
++    <MESSAGE value="add john button" />
++    <option name="LAST_COMMIT_MESSAGE" value="add john button" />
+   </component>
+ </project>
+\ No newline at end of file
+Index: src/panels/MenuPage.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/panels/MenuPage.java b/src/panels/MenuPage.java
+new file mode 100644
+--- /dev/null	(date 1773239645888)
++++ b/src/panels/MenuPage.java	(date 1773239645888)
+@@ -0,0 +1,74 @@
++package panels;
++
++import java.awt.*;
++import java.awt.event.*;
++import javax.swing.*;
++import main.GamePanel;
++
++public class MenuPage {
++    GamePanel gp;
++
++    // Buttons
++    public Rectangle startBtn, ivanBtn, nimuelBtn, samBtn, libraryBtn, exitBtn;
++
++    public MenuPage(GamePanel gp) {
++        this.gp = gp;
++        initButtons();
++    }
++
++    private void initButtons() {
++        int btnW = 300;
++        int btnH = 60;
++        int centerX = gp.screenWidth / 2 - btnW / 2;
++
++        startBtn = new Rectangle(centerX, 250, btnW, btnH);
++        ivanBtn = new Rectangle(centerX, 350, btnW, btnH);
++        nimuelBtn = new Rectangle(centerX, 450, btnW, btnH);
++        samBtn = new Rectangle(centerX, 550, btnW, btnH);
++        libraryBtn = new Rectangle(centerX, 650, btnW, btnH);
++        exitBtn = new Rectangle(centerX, 750, btnW, btnH);
++    }
++
++    public void draw(Graphics2D g2) {
++        g2.setColor(new Color(50, 50, 80));
++        g2.fillRect(0, 0, gp.getWidth(), gp.getHeight());
++
++        g2.setColor(Color.WHITE);
++        g2.setFont(new Font("Arial", Font.BOLD, 50));
++        g2.drawString("MAIN MENU", gp.getWidth() / 2 - 150, 150);
++
++        drawBtn(g2, "START GAME", startBtn);
++        drawBtn(g2, "IVAN", ivanBtn);
++        drawBtn(g2, "NIMUEL", nimuelBtn);
++        drawBtn(g2, "SAM", samBtn);
++        drawBtn(g2, "LIBRARY", libraryBtn);
++        drawBtn(g2, "EXIT", exitBtn);
++    }
++
++    private void drawBtn(Graphics2D g2, String text, Rectangle r) {
++        g2.setColor(Color.WHITE);
++        g2.draw(r);
++        g2.setFont(new Font("Arial", Font.BOLD, 30));
++        FontMetrics fm = g2.getFontMetrics();
++        int textX = r.x + (r.width - fm.stringWidth(text)) / 2;
++        int textY = r.y + (r.height - fm.getHeight()) / 2 + fm.getAscent();
++        g2.drawString(text, textX, textY);
++    }
++
++    public void handleClick(Point p) {
++        if (startBtn.contains(p)) {
++            gp.gameState = gp.playState;
++            gp.player = new gp.playerClass(gp, gp.keyH, "ivan"); // default
++        } else if (ivanBtn.contains(p)) {
++            gp.selectChar("ivan");
++        } else if (nimuelBtn.contains(p)) {
++            gp.selectChar("nimuel");
++        } else if (samBtn.contains(p)) {
++            gp.selectChar("sam");
++        } else if (libraryBtn.contains(p)) {
++            new gp.LibraryUI(); // open library window
++        } else if (exitBtn.contains(p)) {
++            System.exit(0);
++        }
++    }
++}
+\ No newline at end of file
+Index: src/panels/SelectCharacter.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/panels/SelectCharacter.java b/src/panels/SelectCharacter.java
+new file mode 100644
+--- /dev/null	(date 1773239645888)
++++ b/src/panels/SelectCharacter.java	(date 1773239645888)
+@@ -0,0 +1,117 @@
++package panels;
++
++import entity.Player;
++import java.awt.*;
++import java.awt.event.MouseAdapter;
++import java.awt.event.MouseEvent;
++import java.awt.image.BufferedImage;
++import javax.imageio.ImageIO;
++import main.GamePanel;
++
++public class SelectCharacter {
++
++    GamePanel gp;
++
++    Rectangle ivanBtn, nimuelBtn, samBtn;
++    String hoveredChar = "";
++    BufferedImage ivanImg, nimuelImg, samImg;
++
++    public SelectCharacter(GamePanel gp) {
++        this.gp = gp;
++        initButtons();
++        loadImages();
++
++        gp.addMouseListener(new MouseAdapter() {
++            @Override
++            public void mousePressed(MouseEvent e) {
++                if (gp.gameState == gp.charSelectState) handleClick(e.getPoint());
++            }
++        });
++
++        gp.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
++            @Override
++            public void mouseMoved(MouseEvent e) {
++                if (gp.gameState == gp.charSelectState) handleHover(e.getPoint());
++                else hoveredChar = "";
++            }
++        });
++    }
++
++    private void initButtons() {
++        int btnW = 250, btnH = 60;
++        int centerX = gp.screenWidth / 2 - btnW / 2;
++        ivanBtn = new Rectangle(centerX, 250, btnW, btnH);
++        nimuelBtn = new Rectangle(centerX, 350, btnW, btnH);
++        samBtn = new Rectangle(centerX, 450, btnW, btnH);
++    }
++
++    private void loadImages() {
++        try {
++            ivanImg = ImageIO.read(getClass().getResourceAsStream("/res/sprites/ivan/ivan_front_stand.png"));
++            nimuelImg = ImageIO.read(getClass().getResourceAsStream("/res/sprites/nimuel/nimuel_front_stand.png"));
++            samImg = ImageIO.read(getClass().getResourceAsStream("/res/sprites/sam/sam_front_stand.png"));
++        } catch (Exception e) {
++            System.out.println("Failed to load character images.");
++        }
++    }
++
++    private void handleClick(Point p) {
++        if (ivanBtn.contains(p)) selectChar("ivan");
++        else if (nimuelBtn.contains(p)) selectChar("nimuel");
++        else if (samBtn.contains(p)) selectChar("sam");
++    }
++
++    private void handleHover(Point p) {
++        if (ivanBtn.contains(p)) hoveredChar = "Ivan: Attack +10, HP +100";
++        else if (nimuelBtn.contains(p)) hoveredChar = "Nimuel: Magic +15, MP +120";
++        else if (samBtn.contains(p)) hoveredChar = "Sam: Defense +20, HP +150";
++        else hoveredChar = "";
++    }
++
++    private void selectChar(String name) {
++        gp.player = new Player(gp, gp.keyH, name);
++        gp.gameState = gp.playState;
++    }
++
++    public void draw(Graphics2D g2) {
++        g2.setColor(new Color(50,50,80));
++        g2.fillRect(0,0,gp.getWidth(), gp.getHeight());
++
++        g2.setColor(Color.WHITE);
++        g2.setFont(new Font("Arial", Font.BOLD, 50));
++        g2.drawString("SELECT CHARACTER", gp.getWidth()/2 - 220, 150);
++
++        drawBtn(g2, "IVAN", ivanBtn);
++        drawBtn(g2, "NIMUEL", nimuelBtn);
++        drawBtn(g2, "SAM", samBtn);
++
++        // Draw hover text
++        if (!hoveredChar.isEmpty()) {
++            g2.setFont(new Font("Arial", Font.PLAIN, 28));
++            g2.setColor(Color.YELLOW);
++            g2.drawString(hoveredChar, gp.getWidth()/2 - 150, 550);
++        }
++
++        // Draw hover image
++        if (ivanBtn.contains(gp.getMousePosition())) drawHoverImage(g2, ivanImg);
++        else if (nimuelBtn.contains(gp.getMousePosition())) drawHoverImage(g2, nimuelImg);
++        else if (samBtn.contains(gp.getMousePosition())) drawHoverImage(g2, samImg);
++    }
++
++    private void drawHoverImage(Graphics2D g2, BufferedImage img) {
++        if (img != null) {
++            int w = 150, h = 150;
++            g2.drawImage(img, gp.getWidth()/2 - w/2, 380, w, h, null);
++        }
++    }
++
++    private void drawBtn(Graphics2D g2, String text, Rectangle r) {
++        g2.setColor(Color.WHITE);
++        g2.draw(r);
++        g2.setFont(new Font("Arial", Font.BOLD, 30));
++        FontMetrics fm = g2.getFontMetrics();
++        int textX = r.x + (r.width - fm.stringWidth(text))/2;
++        int textY = r.y + (r.height - fm.getHeight())/2 + fm.getAscent();
++        g2.drawString(text, textX, textY);
++    }
++}
+\ No newline at end of file
