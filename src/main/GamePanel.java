@@ -421,41 +421,42 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void refreshHover() {
-        hoveredBtn = null;
-        hoveredCharColor = 0;
-        if (settingsOpen && settingsMuteRect().contains(mouse)) {
-            hoveredBtn = isMuted ? "wmuted" : "wmute";
-            return;
-        }
-        if ((gameState == menuState || gameState == menuCharState) && fixedMenuSettingsRect().contains(mouse)) {
-            hoveredBtn = "settings";
-            return;
-        }
-        if (gameState == menuCharState) {
-            String charHover = charButtonAt(mouse);
-            if (charHover != null) {
-                hoveredBtn = charHover;
-                hoveredCharColor = charColor(charHover);
+    hoveredBtn = null;
+    hoveredCharColor = 0;
+    if (settingsOpen && settingsMuteRect().contains(mouse)) {
+        hoveredBtn = isMuted ? "wmuted" : "wmute";
+        return;
+    }
+    if ((gameState == menuState || gameState == menuCharState) && fixedMenuSettingsRect().contains(mouse)) {
+        hoveredBtn = "settings";
+        return;
+    }
+    if (gameState == menuCharState) {
+        // FIX: only check actual button rectangles, ignore everything else
+        for (String name : List.of("ivan", "sam", "nimuel", "johnfiel")) {
+            Rectangle r = charButtonRect(name);
+            if (r != null && r.contains(mouse)) {
+                hoveredBtn = name;
+                hoveredCharColor = charColor(name);
                 return;
             }
         }
-        if (gameState == playState || gameState == inventoryState || gameState == abilityState) {
-            hoveredBtn = worldButtonAt(mouse);
-            return;
-        }
-        int c = switch (gameState) {
-            case menuState      -> colorAt(menuMainHitbox,  mouse);
-            case menuStartState -> colorAt(menuStartHitbox, mouse);
-            case menuCharState  -> colorAt(menuCharHitbox,  mouse);
-            case battleState    -> colorAt(battleHitbox,    mouse);
-            case outcomeState   -> colorAt(outcomeHitbox,   mouse);
-            default -> 0;
-        };
-        if (gameState == menuCharState && c == BC_HOVCHAR) {
-            hoveredCharColor = nearestCharColor(mouse);
-        }
-        hoveredBtn = c2k(c);
+        // Mouse is not over any character button — show nothing
+        return;
     }
+    if (gameState == playState || gameState == inventoryState || gameState == abilityState) {
+        hoveredBtn = worldButtonAt(mouse);
+        return;
+    }
+    int c = switch (gameState) {
+        case menuState      -> colorAt(menuMainHitbox,  mouse);
+        case menuStartState -> colorAt(menuStartHitbox, mouse);
+        case battleState    -> colorAt(battleHitbox,    mouse);
+        case outcomeState   -> colorAt(outcomeHitbox,   mouse);
+        default -> 0;
+    };
+    hoveredBtn = c2k(c);
+}
 
     /** Scan nearby hitbox pixels to find which character slot is actually nearest */
     private int nearestCharColor(Point p) {
