@@ -3,9 +3,9 @@ package entity;
 public class CharacterStats {
 
     public enum CharacterType {
-        IVAN("Ivan", "Balanced All Around", 100, 1.0),
-        NIMUEL("Nimuel", "Glass Cannon", 70, 1.5),
-        SAM("Sam", "Tank", 130, 0.7),
+        IVAN("Ivan", "Balanced All Around", 100, 1.3),
+        NIMUEL("Nimuel", "Glass Cannon", 70, 1.6),
+        SAM("Sam", "Tank", 130, 1.0),
         JOHNFIEL("Johnfiel", "Cheat", 999, 999.0);
 
         public final String displayName;

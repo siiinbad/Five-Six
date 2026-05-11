@@ -15,7 +15,7 @@ public class Player extends Entity {
     KeyHandler keyH;
     public String characterName;
     boolean nearInteractable = false;
-    boolean eWasPressed = false;
+    public boolean eWasPressed = false;
 
     public CharacterStats.CharacterType charType;
     public double damageMultiplier;
@@ -115,6 +115,7 @@ public class Player extends Entity {
     }
 
     private void checkInteractions() {
+        if (!gp.currentDialog.isEmpty() && gp.lastNPCColor == 0) return;
         nearInteractable = false;
         if (gp.hitboxImage == null) return;
         Rectangle playerBox = getPlayerCollisionBox(x, y);
@@ -128,14 +129,14 @@ public class Player extends Entity {
             return;
         }
         if (!interactable) {
-            if (!gp.currentDialog.isEmpty()) {
+            if (!gp.currentDialog.isEmpty() && gp.lastNPCColor != 0) {
                 gp.currentDialog = "";
                 gp.dialogStage = 0;
                 gp.lastNPCColor = 0;
             }
             return;
         }
-        nearInteractable = true;
+                nearInteractable = true;
         if (gp.lastNPCColor != color) {
             gp.dialogStage = 0;
             gp.lastNPCColor = color;

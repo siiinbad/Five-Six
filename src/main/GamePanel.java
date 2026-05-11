@@ -101,8 +101,9 @@ public class GamePanel extends JPanel implements Runnable {
     private String musicTrack   = "";
     private Thread musicThread  = null;
     private volatile boolean stopMusicRequested = false;
-    public float musicVolume = 0.5f;  // 0.0 to 1.0
-    public float sfxVolume   = 0.8f;  // 0.0 to 1.0
+    public float musicVolume = 0.25f;  // 0.0 to 1.0
+    public float sfxVolume   = 0.5f;  // 0.0 to 1.0
+
 
     // SAVE
     private SaveData saveData = null;
@@ -120,6 +121,7 @@ public class GamePanel extends JPanel implements Runnable {
     public int dialogStage      = 0;
     public int lastNPCColor     = 0;
     private int talkShake       = 0;
+    private boolean eWasItemDialogHeld = false;
 
     // NARRATION (post-vaughn)
     private boolean narrating    = false;
@@ -553,37 +555,43 @@ public class GamePanel extends JPanel implements Runnable {
     // ─────────────────────────────────────────────────────────────
     //  MOUSE CLICK
     // ─────────────────────────────────────────────────────────────
-    private void onClick(Point p) {
-        playSFX("click");
-        if (quitConfirmOpen) {
-            quitConfirmClick(p);
-            return;
-        }
-        if (settingsOpen) {
-            settingsClick(p);
-            return;
-        }
-        if ((gameState == menuState || gameState == menuCharState) && fixedMenuSettingsRect().contains(p)) {
-            settingsOpen = true;
-            return;
-        }
-        int c;
-        switch (gameState) {
-            case menuState      -> { c = colorAt(menuMainHitbox, p);  menuClick(c); }
-            case menuStartState -> { c = colorAt(menuStartHitbox, p); menuStartClick(c); }
-            case menuCharState  -> { c = colorAt(menuCharHitbox, p);  charClick(c, p); }
-            case playState, inventoryState, abilityState -> {
-                worldClick(p);
-            }
-            case fadeState -> { }
-            case battleState -> { battleClick(colorAt(battleHitbox, p), p); }
-            case outcomeState -> { if (colorAt(outcomeHitbox, p) == BC_CONTBAT) nextRound(); }
-            case creditsState -> gameState = menuState;
-            case winState -> { resetToMenu(); }
-            case loseState -> { resetToMenu(); }
-            case resultState -> resultClick(p);
-        }
+private void onClick(Point p) {
+    playSFX("click");
+    if (quitConfirmOpen) {
+        quitConfirmClick(p);
+        return;
     }
+    if (settingsOpen) {
+        settingsClick(p);
+        return;
+    }
+    if ((gameState == menuState || gameState == menuCharState) && fixedMenuSettingsRect().contains(p)) {
+        settingsOpen = true;
+        return;
+    }
+    if (gameState == inventoryState) {
+        handleItemClick(p);
+        return;
+    }
+    if (gameState == abilityState) {
+        handleAbilityClick(p);
+        return;
+    }
+    int c;
+    switch (gameState) {
+        case menuState      -> { c = colorAt(menuMainHitbox, p);  menuClick(c); }
+        case menuStartState -> { c = colorAt(menuStartHitbox, p); menuStartClick(c); }
+        case menuCharState  -> { c = colorAt(menuCharHitbox, p);  charClick(c, p); }
+        case playState      -> worldClick(p);
+        case fadeState      -> { }
+        case battleState    -> { c = colorAt(battleHitbox, p); battleClick(c, p); }
+        case outcomeState   -> { if (colorAt(outcomeHitbox, p) == BC_CONTBAT) nextRound(); }
+        case creditsState   -> gameState = menuState;
+        case winState       -> { resetToMenu(); }
+        case loseState      -> { resetToMenu(); }
+        case resultState    -> resultClick(p);
+    }
+}
 
     private void resetToMenu() {
         stopMusic();
@@ -629,56 +637,39 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void worldClick(Point p) {
-        if (gameState == inventoryState) {
-            handleItemClick(p);
-            // If still in inventoryState after click (no row hit), check if they clicked the button to close
-            if (gameState == inventoryState) {
-                String key = worldButtonAt(p);
-                if ("item_inv".equals(key)) { gameState = playState; return; }
-                if ("abil_inv".equals(key)) { prevStateBeforePanel = playState; gameState = abilityState; return; }
-            }
-            return;
-        }
-        if (gameState == abilityState) {
-            handleAbilityClick(p);
-            // If still in abilityState after click (no row hit or locked), check button clicks
-            if (gameState == abilityState) {
-                String key = worldButtonAt(p);
-                if ("abil_inv".equals(key)) { gameState = playState; return; }
-                if ("item_inv".equals(key)) { prevStateBeforePanel = playState; gameState = inventoryState; return; }
-            }
-            return;
-        }
-        String key = worldButtonAt(p);
-        if (key == null) return;
-        switch (key) {
-            case "item_inv" -> { prevStateBeforePanel = playState; toggleState(inventoryState); }
-            case "abil_inv" -> { prevStateBeforePanel = playState; toggleState(abilityState); }
-            case "backmenu" -> requestQuit(true);
-            case "wsave"    -> { autoSave(); abilMsg = "Game saved!"; abilMsgTimer = 120; }
-            case "wset" -> settingsOpen = true;
-        }
+    if (gameState == inventoryState || gameState == abilityState) return;
+    String key = worldButtonAt(p);
+    if (key == null) return;
+    switch (key) {
+        case "item_inv" -> { prevStateBeforePanel = playState; toggleState(inventoryState); }
+        case "abil_inv" -> { prevStateBeforePanel = playState; toggleState(abilityState); }
+        case "backmenu" -> requestQuit(true);
+        case "wsave"    -> { autoSave(); abilMsg = "Game saved!"; abilMsgTimer = 120; }
+        case "wset" -> settingsOpen = true;
     }
+}
 
     private void toggleState(int s) {
         gameState = (gameState == s) ? playState : s;
     }
 
     private void battleClick(int c, Point p) {
-        if (!currentDialog.isEmpty()) {
-            currentDialog = "";
-            return;
-        }
-        if (!waitingOutcome) {
-            switch (c) {
-                case BC_ROCKBTN  -> resolve(BattleSystem.Move.ROCK);
-                case BC_PAPERBTN -> resolve(BattleSystem.Move.PAPER);
-                case BC_SCISSBTN -> resolve(BattleSystem.Move.SCISSORS);
-                case BC_USEITEM  -> { if (!items.isEmpty()) { prevStateBeforePanel = battleState; gameState = inventoryState; } }
-                case BC_USEABIL  -> { if (!abilities.isEmpty()) { prevStateBeforePanel = battleState; gameState = abilityState; } }
-            }
+    if (gameState == inventoryState) return;
+    if (gameState == abilityState) return;
+    if (!currentDialog.isEmpty()) {
+        currentDialog = "";
+        return;
+    }
+    if (!waitingOutcome) {
+        switch (c) {
+            case BC_ROCKBTN  -> resolve(BattleSystem.Move.ROCK);
+            case BC_PAPERBTN -> resolve(BattleSystem.Move.PAPER);
+            case BC_SCISSBTN -> resolve(BattleSystem.Move.SCISSORS);
+            case BC_USEITEM  -> { if (!items.isEmpty()) { prevStateBeforePanel = battleState; gameState = inventoryState; } }
+            case BC_USEABIL  -> { if (!abilities.isEmpty()) { prevStateBeforePanel = battleState; gameState = abilityState; } }
         }
     }
+}
 
     private void settingsClick(Point p) {
     Rectangle panelR = settingsPanelRect();
@@ -763,24 +754,46 @@ private Rectangle musicSliderTrack() {
     }
 }
     private void handleItemClick(Point p) {
-        int pw=520, px=getWidth()/2-260, py=getHeight()/2-210;
-        List<ItemSystem.Item> list = items.getItems();
-        int iy = py + 72;
-        for (ItemSystem.Item item : list) {
-            if (new Rectangle(px+20, iy-28, pw-40, 38).contains(p)) { useItem(item); return; }
-            iy += 48;
+    int pw = 520, ph = 420;
+    int px = getWidth() / 2 - pw / 2;
+    int py = getHeight() / 2 - ph / 2;
+
+    List<ItemSystem.Item> list = items.getItems();
+    int iy = py + 88; // matches paintInventory
+    for (ItemSystem.Item item : list) {
+        if (new Rectangle(px + 20, iy - 28, pw - 40, 38).contains(p)) {
+            useItem(item);
+            return;
         }
+        iy += 48;
+        if (iy > py + ph - 44) break;
     }
+    // Inside panel but missed all rows — keep open
+    if (new Rectangle(px, py, pw, ph).contains(p)) return;
+    // Outside panel — close
+    gameState = prevStateBeforePanel;
+}
 
     private void handleAbilityClick(Point p) {
-        int pw=540, px=getWidth()/2-270, py=getHeight()/2-210;
-        List<AbilitySystem.Ability> unique = abilities.getUnique();
-        int ay = py + 72;
-        for (AbilitySystem.Ability ab : unique) {
-            if (new Rectangle(px+20, ay-28, pw-40, 38).contains(p)) { useAbility(ab); return; }
-            ay += 48;
+    int pw = 560, ph = 440;
+    int px = getWidth() / 2 - pw / 2;
+    int py = getHeight() / 2 - ph / 2;
+
+    List<AbilitySystem.Ability> unique = abilities.getUnique();
+    int ay = py + 88; // matches paintAbility
+    for (AbilitySystem.Ability ab : unique) {
+        if (new Rectangle(px + 16, ay - 26, pw - 32, 36).contains(p)) {
+            useAbility(ab);
+            return;
         }
+        ay += 46;
+        if (ay > py + ph - 40) break;
     }
+    // Inside panel but missed all rows — keep open
+    if (new Rectangle(px, py, pw, ph).contains(p)) return;
+    // Outside panel — close
+    gameState = prevStateBeforePanel;
+}
 
     // ─────────────────────────────────────────────────────────────
     //  CHARACTER SELECT
@@ -992,7 +1005,7 @@ private Rectangle musicSliderTrack() {
 
         switch (result) {
             case PLAYER_WIN -> {
-                int dmg = (int) Math.max(1, (rand.nextInt(10)+1) * dm);
+                int dmg = (int) Math.max(5, (rand.nextInt(10)+1) * dm);
                 if (fxFullCounter) { dmg *= 2; fxFullCounter = false; }
                 fxUnoReverse = false;
                 enemyHP = Math.max(0, enemyHP - dmg);
@@ -1008,7 +1021,7 @@ private Rectangle musicSliderTrack() {
                 }
             }
             case ENEMY_WIN -> {
-                int dmg = (int) Math.max(1, Math.ceil(((rand.nextInt(10)+1) * enemyDamageMultiplier) / Math.max(0.1, player.damageMultiplier)));
+                int dmg = (int) Math.max(4, Math.ceil(((rand.nextInt(10)+1) * enemyDamageMultiplier) / Math.max(0.1, player.damageMultiplier)));
                 if (isFinalBoss) dmg = (int)(dmg * 1.5);
                 if (fxUnoReverse || fxFullCounter) {
                     int ref = fxFullCounter ? dmg*2 : dmg;
@@ -1043,7 +1056,7 @@ private Rectangle musicSliderTrack() {
     private int healPlayerAfterEnemyDefeat() {
         if (player == null || player.currentHP <= 0) return 0;
         int before = player.currentHP;
-        int amount = Math.max(1, (int) Math.ceil(player.maxHP * 0.20));
+        int amount = Math.max(1, (int) Math.ceil(player.maxHP * 0.05));
         player.currentHP = Math.min(player.maxHP, player.currentHP + amount);
         return player.currentHP - before;
     }
@@ -1141,37 +1154,37 @@ private Rectangle musicSliderTrack() {
     //  ITEMS / ABILITIES
     // ─────────────────────────────────────────────────────────────
     private void useItem(ItemSystem.Item item) {
-        boolean inBattle = prevStateBeforePanel == battleState;
+    boolean inBattle = prevStateBeforePanel == battleState;
 
-        // REMOVED: healing items were previously blocked in battle.
-        // All items including healing items are now usable during battle.
-
-        if (item == ItemSystem.Item.GREENCROSS && !inBattle) {
-            showPlayerUseDialog(item.displayName, "You can only use this during battle.");
-            gameState = prevStateBeforePanel;
-            return;
-        }
-
-        if (isHealingItem(item) && player != null && player.currentHP >= player.maxHP) {
-            currentDialog = "You are currently at max hp you cant heal";
-            lastNPCColor = 0;
-            gameState = prevStateBeforePanel;
-            return;
-        }
-
-        items.remove(item);
-        switch (item) {
-            case WATER        -> player.currentHP = Math.min(player.currentHP + player.maxHP / 10, player.maxHP);
-            case BARNUTS      -> player.currentHP = Math.min(player.currentHP + 5, player.maxHP);
-            case GREENCROSS   -> { fxHealRounds = 3; fxHealAmt = 5; player.currentHP = Math.max(1, player.currentHP - 2); }
-            case COFFEE       -> player.maxHP += 10;
-            case ENERGY_DRINK -> player.damageMultiplier += 0.05;
-            case SLEEPING_MASK-> player.currentHP = player.maxHP;
-        }
-        showPlayerUseDialog(item.displayName, item.description);
+    if (item == ItemSystem.Item.GREENCROSS && !inBattle) {
+        currentDialog = "Greencross can only be used during battle.";
+        lastNPCColor = 0;
         gameState = prevStateBeforePanel;
-        autoSave();
+        return;
     }
+
+    if (isHealingItem(item) && item != ItemSystem.Item.GREENCROSS
+            && player != null && player.currentHP >= player.maxHP) {
+        currentDialog = "You are already at full HP!";
+        lastNPCColor = 0;
+        gameState = prevStateBeforePanel;
+        return;
+    }
+
+    items.remove(item);
+    switch (item) {
+        case WATER         -> player.currentHP = Math.min(player.currentHP + player.maxHP / 10, player.maxHP);
+        case BARNUTS       -> player.currentHP = Math.min(player.currentHP + 5, player.maxHP);
+        case GREENCROSS    -> { fxHealRounds = 3; fxHealAmt = 5; player.currentHP = Math.max(1, player.currentHP - 2); }
+        case COFFEE        -> player.maxHP += 10;
+        case ENERGY_DRINK  -> player.damageMultiplier += 0.05;
+        case SLEEPING_MASK -> player.currentHP = player.maxHP;
+    }
+    currentDialog = capitalize(player.characterName) + " used " + item.displayName + ". " + item.description;
+    lastNPCColor = 0;
+    gameState = prevStateBeforePanel;
+    autoSave();
+}
 
     private boolean isHealingItem(ItemSystem.Item item) {
         return switch (item) {
@@ -1181,31 +1194,32 @@ private Rectangle musicSliderTrack() {
     }
 
     private void useAbility(AbilitySystem.Ability ability) {
-        if (prevStateBeforePanel != battleState) return; // view-only outside battle
+    if (prevStateBeforePanel != battleState) return;
 
-        abilities.remove(ability);
-        String effect = ability.description;
-        switch (ability) {
-            case CLAIRVOYANCE -> {
-                clairMove = BattleSystem.getRandomEnemyMove();
-                String moveName = switch (clairMove) {
-                    case ROCK     -> "Rock";
-                    case PAPER    -> "Paper";
-                    case SCISSORS -> "Scissors";
-                };
-                clairText = enemyName + " will pick " + moveName + " next turn.";
-                effect = enemyName + " will pick " + moveName + " next turn.";
-                clairVisible = true;
-            }
-            case UNO_REVERSE  -> fxUnoReverse  = true;
-            case HYPNOTIZE    -> fxHypnotize   = true;
-            case YOU_CHEATER  -> fxYouCheater  = true;
-            case FULL_COUNTER -> fxFullCounter = true;
+    abilities.remove(ability);
+    String effect = ability.description;
+    switch (ability) {
+        case CLAIRVOYANCE -> {
+            clairMove = BattleSystem.getRandomEnemyMove();
+            String moveName = switch (clairMove) {
+                case ROCK     -> "Rock";
+                case PAPER    -> "Paper";
+                case SCISSORS -> "Scissors";
+            };
+            clairText = enemyName + " will pick " + moveName + " next turn.";
+            effect = enemyName + " will pick " + moveName + " next turn.";
+            clairVisible = true;
         }
-        showPlayerUseDialog(ability.displayName, effect);
-        gameState = prevStateBeforePanel;
-        autoSave();
+        case UNO_REVERSE  -> fxUnoReverse  = true;
+        case HYPNOTIZE    -> fxHypnotize   = true;
+        case YOU_CHEATER  -> fxYouCheater  = true;
+        case FULL_COUNTER -> fxFullCounter = true;
     }
+    currentDialog = capitalize(player.characterName) + " used " + ability.displayName + ". " + effect;
+    lastNPCColor = 0;
+    gameState = prevStateBeforePanel;
+    autoSave();
+}
 
     private void showPlayerUseDialog(String name, String effect) {
         if (playerDialogImg == null) loadPlayerDialogImages();
@@ -1241,13 +1255,22 @@ private Rectangle musicSliderTrack() {
         }
         if (!keyH.ePressed) eWasPanelHeld = false;
         if (gameState == playState && player != null) {
-            player.update();
-            if (keyH.f1Pressed && !f1WasHeld) { showDebug = !showDebug; f1WasHeld = true; }
-            if (!keyH.f1Pressed) f1WasHeld = false;
-        }
+    player.update();
+    if (keyH.f1Pressed && !f1WasHeld) { showDebug = !showDebug; f1WasHeld = true; }
+    if (!keyH.f1Pressed) f1WasHeld = false;
+}
         if (gameState == battleState && !currentDialog.isEmpty() && keyH.ePressed) {
             currentDialog = "";
         }
+        if (gameState == playState && !currentDialog.isEmpty() && lastNPCColor == 0) {
+    if (keyH.ePressed && !eWasItemDialogHeld) {
+        eWasItemDialogHeld = true;
+        currentDialog = "";
+        if (player != null) player.eWasPressed = true; // block NPC trigger on same keypress
+    }
+}
+if (!keyH.ePressed) eWasItemDialogHeld = false;
+        if (!keyH.ePressed) eWasItemDialogHeld = false;
         // Narration advance (dedicated state — player cannot move here)
         if (gameState == narrationState) {
             if (keyH.ePressed && !eWasNarHeld) {
