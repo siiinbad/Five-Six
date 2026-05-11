@@ -17,6 +17,7 @@ public class SaveData implements Serializable {
     public int    playerHP = 0;
     public int    playerMaxHP = 0;
     public double damageMultiplier = 1.0;
+    public int    completedFights = 0;
 
     public Set<Integer> defeatedEnemies = new HashSet<>();
     public List<ItemSystem.Item> items = new ArrayList<>();              // flat list
@@ -28,7 +29,8 @@ public class SaveData implements Serializable {
 
     public SaveData(String characterName, String currentMapName, int playerHP, int playerMaxHP,
                     double damageMultiplier, Set<Integer> defeatedEnemies,
-                    List<ItemSystem.Item> items, List<AbilitySystem.Ability> abilities) {
+                    List<ItemSystem.Item> items, List<AbilitySystem.Ability> abilities,
+                    int completedFights) {
         this.characterName = safeName(characterName);
         this.currentMapName = (currentMapName == null || currentMapName.isBlank()) ? "gle" : currentMapName;
         this.playerHP = playerHP;
@@ -37,6 +39,7 @@ public class SaveData implements Serializable {
         this.defeatedEnemies = (defeatedEnemies == null) ? new HashSet<>() : new HashSet<>(defeatedEnemies);
         this.items = (items == null) ? new ArrayList<>() : new ArrayList<>(items);
         this.abilities = (abilities == null) ? new ArrayList<>() : new ArrayList<>(abilities);
+        this.completedFights = Math.max(0, completedFights);
         this.lastSavedAtMs = System.currentTimeMillis();
     }
 

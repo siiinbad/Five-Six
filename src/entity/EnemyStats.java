@@ -15,11 +15,17 @@ public class EnemyStats {
     public Set<Integer> getDefeatedEnemies() { return defeated; }
     public void setDefeated(Set<Integer> d)  { defeated = new HashSet<>(d); }
 
-    /** HP scales up with every enemy already beaten */
+    /** HP scales up with every enemy already beaten. */
     public int getEnemyHP(int color) {
-        if (color == 0xFFFFFF) { // COLOR_FINALBOSS — always a tough fixed HP
-            return 300 + HP_INC * defeated.size();
+        return getEnemyHP(color, defeated.size());
+    }
+
+    /** HP scales up with completed fights so enemies keep getting tougher over time. */
+    public int getEnemyHP(int color, int completedFights) {
+        int fights = Math.max(0, completedFights);
+        if (color == 0xFFFFFF) {
+            return 300 + HP_INC * fights;
         }
-        return BASE_HP + HP_INC * defeated.size();
+        return BASE_HP + HP_INC * fights;
     }
 }

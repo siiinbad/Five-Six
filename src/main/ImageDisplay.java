@@ -25,6 +25,8 @@ public class ImageDisplay {
     private BufferedImage battleSceneImg;
     private BufferedImage outcomeSceneImg;
     private BufferedImage outcomeRPSImg;
+    private BufferedImage creditsImg;
+    private BufferedImage winImg;
 
     private final Map<String, BufferedImage[]> btnImgs = new HashMap<>();
     private final Map<String, BufferedImage> npcStand = new HashMap<>();
@@ -39,6 +41,10 @@ public class ImageDisplay {
     public void loadAll() {
         menuScreenImg = img("/res/gui/pixelart/menu/menu_screen.png");
         logoImg = img("/res/gui/pixelart/menu/fixsix_log.png");
+        creditsImg = firstImg("/res/gui/pixelart/menu/credits_placeholder.png",
+                "/res/sprites/menu/gui/credits_placeholder.png");
+        winImg = firstImg("/res/gui/pixelart/menu/win_placeholder.png",
+                "/res/sprites/menu/gui/win_placeholder.png");
 
         menuMainHitbox = img("/res/gui/button_hitbox/menu_main_hitbox.png");
         menuStartHitbox = img("/res/gui/button_hitbox/menu_start_hitbox.png");
@@ -130,12 +136,24 @@ public class ImageDisplay {
             enemyDialogImg = img("/res/sprites/enemies/" + folder + "/" + folder + "_dialog.png");
         } else if (isFinalBoss) {
             enemyBattleImg = img("/res/sprites/enemies/finalboss/final_boss.png");
-            enemyDialogImg = enemyBattleImg;
+            enemyDialogImg = firstImg("/res/sprites/enemies/finalboss/finalboss_dialog.png",
+                    "/res/sprites/enemies/finalboss/final_boss_dialog.png",
+                    "/res/sprites/enemies/finalboss/final_boss.png");
         } else {
             enemyBattleImg = null;
             enemyDialogImg = null;
         }
 
+        if (playerName != null && !playerName.isBlank()) {
+            playerBattleImg = img("/res/sprites/player/" + playerName + "/" + playerName + "_battle.png");
+            playerDialogImg = img("/res/sprites/player/" + playerName + "/" + playerName + "_dialog.png");
+        } else {
+            playerBattleImg = null;
+            playerDialogImg = null;
+        }
+    }
+
+    public void loadPlayerImages(String playerName) {
         if (playerName != null && !playerName.isBlank()) {
             playerBattleImg = img("/res/sprites/player/" + playerName + "/" + playerName + "_battle.png");
             playerDialogImg = img("/res/sprites/player/" + playerName + "/" + playerName + "_dialog.png");
@@ -182,6 +200,8 @@ public class ImageDisplay {
     public BufferedImage getBattleSceneImg() { return battleSceneImg; }
     public BufferedImage getOutcomeSceneImg() { return outcomeSceneImg; }
     public BufferedImage getOutcomeRPSImg() { return outcomeRPSImg; }
+    public BufferedImage getCreditsImg() { return creditsImg; }
+    public BufferedImage getWinImg() { return winImg; }
     public Map<String, BufferedImage[]> getButtonImages() { return btnImgs; }
     public Map<String, BufferedImage> getNpcStandImages() { return npcStand; }
     public Map<String, BufferedImage> getCharacterSelectImages() { return charSelectImg; }
@@ -196,6 +216,14 @@ public class ImageDisplay {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private BufferedImage firstImg(String... paths) {
+        for (String path : paths) {
+            BufferedImage im = img(path);
+            if (im != null) return im;
+        }
+        return null;
     }
 
     private void btn(String key, String idle, String hover) {

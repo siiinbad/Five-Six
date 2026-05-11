@@ -10,7 +10,7 @@ public class AbilitySystem {
         CLAIRVOYANCE ("Clairvoyance", "Reveals the enemy's next move."),
         UNO_REVERSE  ("Uno Reverse",  "Reflects next damage instance back to enemy."),
         HYPNOTIZE    ("Hypnotize",    "Forces enemy to pick Rock next turn."),
-        YOU_CHEATER  ("You Cheater",  "If you lose a round, that round is voided."),
+        YOU_CHEATER  ("You Cheater",  "Voids the next enemy-winning round."),
         FULL_COUNTER ("Full Counter", "Reflects next damage at 2x multiplier.");
 
         public final String displayName;
@@ -21,7 +21,7 @@ public class AbilitySystem {
     private final List<Ability> inventory = new ArrayList<>();
 
     public Ability addRandom(Random rand) {
-        Ability[] all = Ability.values();
+        Ability[] all = {Ability.CLAIRVOYANCE, Ability.UNO_REVERSE, Ability.HYPNOTIZE, Ability.YOU_CHEATER, Ability.FULL_COUNTER};
         Ability ab = all[rand.nextInt(all.length)];
         inventory.add(ab);
         return ab;
@@ -39,8 +39,13 @@ public class AbilitySystem {
     /** Unique abilities (no duplicates), preserving first-seen order */
     public List<Ability> getUnique() {
         List<Ability> seen = new ArrayList<>();
-        for (Ability a : inventory) if (!seen.contains(a)) seen.add(a);
+        for (Ability a : inventory) {
+            if (!seen.contains(a)) seen.add(a);
+        }
         return seen;
     }
-    public void setAbilities(List<Ability> abs) { inventory.clear(); inventory.addAll(abs); }
+    public void setAbilities(List<Ability> abs) {
+        inventory.clear();
+        inventory.addAll(abs);
+    }
 }

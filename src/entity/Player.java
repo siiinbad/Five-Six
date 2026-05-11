@@ -38,7 +38,7 @@ public class Player extends Entity {
     public void respawnWithPenalty() {
         x = spawnX;
         y = spawnY;
-        setHPPercent(0.30);
+        setHPPercent(0.20);
     }
 
     private void loadImages() {

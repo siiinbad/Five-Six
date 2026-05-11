@@ -72,6 +72,8 @@ public class GamePanel extends JPanel implements Runnable {
     private BufferedImage battleSceneImg;
     private BufferedImage outcomeSceneImg;
     private BufferedImage outcomeRPSImg;
+    private BufferedImage creditsImg;
+    private BufferedImage winImg;
 
     // BUTTON IMAGES  key -> [idle, hover]
     private final Map<String, BufferedImage[]> btnImgs = new HashMap<>();
@@ -112,7 +114,6 @@ public class GamePanel extends JPanel implements Runnable {
     // DEBUG
     public boolean showDebug   = false;
     private boolean f1WasHeld  = false;
-    private boolean escWasHeld = false;
 
     // DIALOG
     public String currentDialog = "";
@@ -140,6 +141,7 @@ public class GamePanel extends JPanel implements Runnable {
     public EnemyStats     enemyStats    = new EnemyStats();
     private int   enemyHP               = 0;
     private int   enemyMaxHP            = 0;
+    private double enemyDamageMultiplier = 1.0;
     private int   battleRound           = 1;
     private String battleMsg            = "";
     private boolean battleResolved      = false;
@@ -164,16 +166,19 @@ public class GamePanel extends JPanel implements Runnable {
     private boolean fxFullCounter  = false;
     private int     fxHealRounds   = 0;
     private int     fxHealAmt      = 0;
-    private int     fxEnergyRounds = 0;
 
     // CLAIRVOYANCE
     private boolean clairVisible   = false;
     private String  clairText      = "";
     private BattleSystem.Move clairMove = null;  // the actual predicted move used in next resolve()
 
-    // Tracks which state opened the item/ability panel so ESC returns correctly
+    // Tracks which state opened the item/ability panel so the panel closes correctly
     private int prevStateBeforePanel = playState;
     private int autoSaveCountdown = AUTOSAVE_INTERVAL_FRAMES;
+    private int completedFights = 0;
+    private boolean eWasPanelHeld = false;
+    private boolean quitConfirmOpen = false;
+    private boolean quitConfirmToMenu = false;
 
     private final Random rand = new Random();
 
@@ -248,6 +253,8 @@ public class GamePanel extends JPanel implements Runnable {
         battleSceneImg = imageDisplay.getBattleSceneImg();
         outcomeSceneImg = imageDisplay.getOutcomeSceneImg();
         outcomeRPSImg = imageDisplay.getOutcomeRPSImg();
+        creditsImg = imageDisplay.getCreditsImg();
+        winImg = imageDisplay.getWinImg();
         btnImgs.clear();
         btnImgs.putAll(imageDisplay.getButtonImages());
         npcStand.clear();
@@ -414,7 +421,8 @@ public class GamePanel extends JPanel implements Runnable {
                 player.currentHP, player.maxHP, player.damageMultiplier,
                 new HashSet<>(enemyStats.getDefeatedEnemies()),
                 new ArrayList<>(items.getFlatList()),
-                new ArrayList<>(abilities.getAbilities()));
+                new ArrayList<>(abilities.getAbilities()),
+                completedFights);
         saveData.saveToDisk();
     }
 
@@ -426,7 +434,9 @@ public class GamePanel extends JPanel implements Runnable {
         enemyStats.setDefeated(saveData.defeatedEnemies);
         items.setItems(saveData.items);
         abilities.setAbilities(saveData.abilities);
+        completedFights = Math.max(0, saveData.completedFights);
         player = new Player(this, keyH, saveData.characterName);
+        loadPlayerDialogImages();
         player.currentHP        = saveData.playerHP;
         player.maxHP            = saveData.playerMaxHP;
         player.damageMultiplier = saveData.damageMultiplier;
@@ -545,6 +555,10 @@ public class GamePanel extends JPanel implements Runnable {
     // ─────────────────────────────────────────────────────────────
     private void onClick(Point p) {
         playSFX("click");
+        if (quitConfirmOpen) {
+            quitConfirmClick(p);
+            return;
+        }
         if (settingsOpen) {
             settingsClick(p);
             return;
@@ -564,16 +578,30 @@ public class GamePanel extends JPanel implements Runnable {
             case fadeState -> { }
             case battleState -> { battleClick(colorAt(battleHitbox, p), p); }
             case outcomeState -> { if (colorAt(outcomeHitbox, p) == BC_CONTBAT) nextRound(); }
-            case creditsState -> { if (keyH.escPressed) gameState = menuState; }
+            case creditsState -> gameState = menuState;
+            case winState -> { resetToMenu(); }
+            case loseState -> { resetToMenu(); }
             case resultState -> resultClick(p);
         }
+    }
+
+    private void resetToMenu() {
+        stopMusic();
+        player = null;
+        enemyStats = new EnemyStats();
+        items = new ItemSystem();
+        abilities = new AbilitySystem();
+        completedFights = 0;
+        saveData = null;
+        gameState = menuState;
+        playMusic("menu_sountrack");
     }
 
     private void menuClick(int c) {
         switch (c) {
             case BC_START  -> gameState = menuStartState;
             case BC_CREDIT -> gameState = creditsState;
-            case BC_QUIT   -> System.exit(0);
+            case BC_QUIT   -> requestQuit(false);
         }
     }
 
@@ -626,7 +654,7 @@ public class GamePanel extends JPanel implements Runnable {
         switch (key) {
             case "item_inv" -> { prevStateBeforePanel = playState; toggleState(inventoryState); }
             case "abil_inv" -> { prevStateBeforePanel = playState; toggleState(abilityState); }
-            case "backmenu" -> { gameState = menuState; stopMusic(); playMusic("menu_sountrack"); currentDialog = ""; autoSave(); }
+            case "backmenu" -> requestQuit(true);
             case "wsave"    -> { autoSave(); abilMsg = "Game saved!"; abilMsgTimer = 120; }
             case "wset" -> settingsOpen = true;
         }
@@ -637,6 +665,10 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void battleClick(int c, Point p) {
+        if (!currentDialog.isEmpty()) {
+            currentDialog = "";
+            return;
+        }
         if (!waitingOutcome) {
             switch (c) {
                 case BC_ROCKBTN  -> resolve(BattleSystem.Move.ROCK);
@@ -672,10 +704,48 @@ private Rectangle musicSliderTrack() {
     return new Rectangle(panel.x + 30, panel.y + 134, panel.width - 60, 16);
 }
 
-private Rectangle sfxSliderTrack() {
+    private Rectangle sfxSliderTrack() {
     Rectangle panel = settingsPanelRect();
     return new Rectangle(panel.x + 30, panel.y + 204, panel.width - 60, 16);
 }
+
+    private void requestQuit(boolean toMenu) {
+        quitConfirmOpen = true;
+        quitConfirmToMenu = toMenu;
+        settingsOpen = false;
+    }
+
+    private void quitConfirmClick(Point p) {
+        if (quitYesRect().contains(p)) {
+            if (quitConfirmToMenu) {
+                autoSave();
+                gameState = menuState;
+                stopMusic();
+                playMusic("menu_sountrack");
+                currentDialog = "";
+            } else {
+                System.exit(0);
+            }
+            quitConfirmOpen = false;
+        } else if (quitNoRect().contains(p) || !quitConfirmRect().contains(p)) {
+            quitConfirmOpen = false;
+        }
+    }
+
+    private Rectangle quitConfirmRect() {
+        int w = 520, h = 220;
+        return new Rectangle(getWidth() / 2 - w / 2, getHeight() / 2 - h / 2, w, h);
+    }
+
+    private Rectangle quitYesRect() {
+        Rectangle r = quitConfirmRect();
+        return new Rectangle(r.x + 70, r.y + 145, 160, 44);
+    }
+
+    private Rectangle quitNoRect() {
+        Rectangle r = quitConfirmRect();
+        return new Rectangle(r.x + r.width - 230, r.y + 145, 160, 44);
+    }
 
     private void resultClick(Point p) {
     if (battleResolved) {
@@ -720,11 +790,19 @@ private Rectangle sfxSliderTrack() {
     enemyStats = new EnemyStats();
     items      = new ItemSystem();
     abilities  = new AbilitySystem();
+    completedFights = 0;
     player = new Player(this, keyH, name);
+    loadPlayerDialogImages();
     loadMapImages(GLE_MAP);
     gameState = playState;
     autoSave();
 }
+
+    private void loadPlayerDialogImages() {
+        if (player == null) return;
+        imageDisplay.loadPlayerImages(player.characterName);
+        syncImageState();
+    }
 
     public void setPlayerSpawn() {
         if (hitboxImage == null || player == null) return;
@@ -799,6 +877,32 @@ private Rectangle sfxSliderTrack() {
     // ─────────────────────────────────────────────────────────────
     //  FADE
     // ─────────────────────────────────────────────────────────────
+    private Rectangle charButtonDrawRect(String name) {
+        Rectangle assigned = charButtonRect(name);
+        if (assigned == null) return null;
+        Dimension size = characterButtonDrawSize();
+        int w = Math.min(assigned.width, size.width);
+        int h = Math.min(assigned.height, size.height);
+        return new Rectangle(assigned.x + (assigned.width - w) / 2,
+                assigned.y + (assigned.height - h) / 2, w, h);
+    }
+
+    private Dimension characterButtonDrawSize() {
+        int w = Integer.MAX_VALUE;
+        int h = Integer.MAX_VALUE;
+        for (String name : List.of("ivan", "sam", "nimuel", "johnfiel")) {
+            Rectangle r = charButtonRect(name);
+            if (r == null) continue;
+            w = Math.min(w, r.width);
+            h = Math.min(h, r.height);
+        }
+        if (w == Integer.MAX_VALUE || h == Integer.MAX_VALUE) {
+            return new Dimension(Math.max(1, 92 * getWidth() / 500),
+                    Math.max(1, 28 * getHeight() / 342));
+        }
+        return new Dimension(w, h);
+    }
+
     public void startFadeToBlack() {
         gameState = fadeState; fadeAlpha = 0f; fadingIn = true; currentDialog = "";
     }
@@ -817,8 +921,9 @@ private Rectangle sfxSliderTrack() {
     //  BATTLE
     // ─────────────────────────────────────────────────────────────
     private void startBattle() {
-        enemyMaxHP     = enemyStats.getEnemyHP(pendingBattleEnemyColor);
+        enemyMaxHP     = enemyStats.getEnemyHP(pendingBattleEnemyColor, completedFights);
         enemyHP        = enemyMaxHP;
+        enemyDamageMultiplier = 1.0 + completedFights * 0.025;
         battleRound    = 1;
         battleMsg      = "Round " + battleRound + " - Choose your move!";
         battleResolved = false;
@@ -874,7 +979,7 @@ private Rectangle sfxSliderTrack() {
 
         if (result == BattleSystem.BattleResult.ENEMY_WIN && fxYouCheater) {
             fxYouCheater = false;
-            battleMsg = "You Cheater activated! Round voided — pick again.";
+            battleMsg = "You Cheater activated! Round voided - pick again.";
             return;
         }
 
@@ -884,7 +989,6 @@ private Rectangle sfxSliderTrack() {
         }
 
         double dm = player.damageMultiplier;
-        if (fxEnergyRounds > 0) { dm *= 20; fxEnergyRounds--; }
 
         switch (result) {
             case PLAYER_WIN -> {
@@ -893,7 +997,9 @@ private Rectangle sfxSliderTrack() {
                 fxUnoReverse = false;
                 enemyHP = Math.max(0, enemyHP - dmg);
                 if (enemyHP <= 0) {
+                    int healed = healPlayerAfterEnemyDefeat();
                     battleMsg = "You Win! Dealt " + dmg + " dmg — " + enemyName + " defeated!";
+                    if (healed > 0) battleMsg += " Healed " + healed + " HP.";
                     battleResolved = true;
                     enemyStats.markDefeated(pendingBattleEnemyColor);
                     grantRewards();
@@ -902,14 +1008,21 @@ private Rectangle sfxSliderTrack() {
                 }
             }
             case ENEMY_WIN -> {
-                int dmg = (int) Math.max(1, (rand.nextInt(10)+1) / Math.max(0.1, player.damageMultiplier));
+                int dmg = (int) Math.max(1, Math.ceil(((rand.nextInt(10)+1) * enemyDamageMultiplier) / Math.max(0.1, player.damageMultiplier)));
                 if (isFinalBoss) dmg = (int)(dmg * 1.5);
                 if (fxUnoReverse || fxFullCounter) {
                     int ref = fxFullCounter ? dmg*2 : dmg;
                     fxUnoReverse = false; fxFullCounter = false;
                     enemyHP = Math.max(0, enemyHP - ref);
                     battleMsg = "Reflected " + ref + " damage back!";
-                    if (enemyHP <= 0) { battleMsg += " " + enemyName + " defeated!"; battleResolved = true; enemyStats.markDefeated(pendingBattleEnemyColor); grantRewards(); }
+                    if (enemyHP <= 0) {
+                        int healed = healPlayerAfterEnemyDefeat();
+                        battleMsg += " " + enemyName + " defeated!";
+                        if (healed > 0) battleMsg += " Healed " + healed + " HP.";
+                        battleResolved = true;
+                        enemyStats.markDefeated(pendingBattleEnemyColor);
+                        grantRewards();
+                    }
                 } else {
                     player.currentHP = Math.max(0, player.currentHP - dmg);
                     if (player.currentHP <= 0) { battleMsg = "You Lose! Took " + dmg + " dmg — Defeated!"; battleResolved = true; }
@@ -927,17 +1040,25 @@ private Rectangle sfxSliderTrack() {
         gameState = outcomeState;
     }
 
+    private int healPlayerAfterEnemyDefeat() {
+        if (player == null || player.currentHP <= 0) return 0;
+        int before = player.currentHP;
+        int amount = Math.max(1, (int) Math.ceil(player.maxHP * 0.20));
+        player.currentHP = Math.min(player.maxHP, player.currentHP + amount);
+        return player.currentHP - before;
+    }
+
     private void grantRewards() {
     lastRewardItems.clear();
     lastRewardAbils.clear();
 
     if (!isFinalBoss) {
-        int ic = rand.nextInt(5) + 1;
+        int ic = rand.nextInt(6) + 1;
         for (int i = 0; i < ic; i++) {
             ItemSystem.Item it = items.addRandom(rand);
             if (it != null) lastRewardItems.add(it.displayName);
         }
-        int ac = rand.nextDouble() < 0.3 ? rand.nextInt(3) + 1 : 1;
+        int ac = rand.nextDouble() < 0.3 ? rand.nextInt(4) + 1 : 1;
         for (int i = 0; i < ac; i++) {
             AbilitySystem.Ability ab = abilities.addRandom(rand);
             if (ab != null) lastRewardAbils.add(ab.displayName);
@@ -955,6 +1076,8 @@ private Rectangle sfxSliderTrack() {
 
         // Final boss win
         if (isFinalBoss && playerWon) {
+            completedFights++;
+            autoSave();
             stopMusic();
             playSFX("Win_Final_Boss");
             new java.io.File(System.getProperty("user.home") + java.io.File.separator + "fivesix_save.dat").delete();
@@ -969,6 +1092,7 @@ private Rectangle sfxSliderTrack() {
             enemyStats = new EnemyStats();
             items      = new ItemSystem();
             abilities  = new AbilitySystem();
+            completedFights = 0;
             saveData   = null;
             new java.io.File(System.getProperty("user.home") + java.io.File.separator + "fivesix_save.dat").delete();
             gameState = loseState;
@@ -976,6 +1100,8 @@ private Rectangle sfxSliderTrack() {
         }
         // Normal win
         if (playerWon) {
+            completedFights++;
+            autoSave();
             stopMusic();
             playSFX("Win_Normal");
         }
@@ -999,11 +1125,13 @@ private Rectangle sfxSliderTrack() {
     private void startNarration() {
         currentMapName = EMALL_MAP;
         // Pre-load the emall battle scene so paintNarration and paintPreBattle both have it
-        imageDisplay.loadEmallScenes();
+        String playerKey = (player != null) ? player.characterName : null;
+        imageDisplay.loadBattleImages(EMALL_MAP, COLOR_FINALBOSS, true, playerKey);
         syncImageState();
 
         narrating = true; narIndex = 0; eWasNarHeld = false;
-        narLines = DialogueDisplay.finalBossNarration();
+        String playerFirst = (player != null) ? capitalize(player.characterName) : "Player";
+        narLines = DialogueDisplay.finalBossNarration(playerFirst);
         currentDialog = narLines[0];
         gameState = narrationState;
     }
@@ -1018,24 +1146,45 @@ private Rectangle sfxSliderTrack() {
         // REMOVED: healing items were previously blocked in battle.
         // All items including healing items are now usable during battle.
 
+        if (item == ItemSystem.Item.GREENCROSS && !inBattle) {
+            showPlayerUseDialog(item.displayName, "You can only use this during battle.");
+            gameState = prevStateBeforePanel;
+            return;
+        }
+
+        if (isHealingItem(item) && player != null && player.currentHP >= player.maxHP) {
+            currentDialog = "You are currently at max hp you cant heal";
+            lastNPCColor = 0;
+            gameState = prevStateBeforePanel;
+            return;
+        }
+
         items.remove(item);
         switch (item) {
             case WATER        -> player.currentHP = Math.min(player.currentHP + player.maxHP / 10, player.maxHP);
-            case BARNUTS      -> player.currentHP = Math.min(player.currentHP + 50, player.maxHP);
-            case GREENCROSS   -> { fxHealRounds = 10; fxHealAmt = 50; player.currentHP = Math.max(1, player.currentHP - 2); }
+            case BARNUTS      -> player.currentHP = Math.min(player.currentHP + 5, player.maxHP);
+            case GREENCROSS   -> { fxHealRounds = 3; fxHealAmt = 5; player.currentHP = Math.max(1, player.currentHP - 2); }
             case COFFEE       -> player.maxHP += 10;
-            case ENERGY_DRINK -> fxEnergyRounds = 10;
+            case ENERGY_DRINK -> player.damageMultiplier += 0.05;
             case SLEEPING_MASK-> player.currentHP = player.maxHP;
         }
-        abilMsg = "Used " + item.displayName + "!"; abilMsgTimer = 120;
+        showPlayerUseDialog(item.displayName, item.description);
         gameState = prevStateBeforePanel;
         autoSave();
+    }
+
+    private boolean isHealingItem(ItemSystem.Item item) {
+        return switch (item) {
+            case WATER, BARNUTS, GREENCROSS, SLEEPING_MASK -> true;
+            case COFFEE, ENERGY_DRINK -> false;
+        };
     }
 
     private void useAbility(AbilitySystem.Ability ability) {
         if (prevStateBeforePanel != battleState) return; // view-only outside battle
 
         abilities.remove(ability);
+        String effect = ability.description;
         switch (ability) {
             case CLAIRVOYANCE -> {
                 clairMove = BattleSystem.getRandomEnemyMove();
@@ -1044,7 +1193,8 @@ private Rectangle sfxSliderTrack() {
                     case PAPER    -> "Paper";
                     case SCISSORS -> "Scissors";
                 };
-                clairText = "👁 " + enemyName + " will use " + moveName + " next turn!";
+                clairText = enemyName + " will pick " + moveName + " next turn.";
+                effect = enemyName + " will pick " + moveName + " next turn.";
                 clairVisible = true;
             }
             case UNO_REVERSE  -> fxUnoReverse  = true;
@@ -1052,9 +1202,16 @@ private Rectangle sfxSliderTrack() {
             case YOU_CHEATER  -> fxYouCheater  = true;
             case FULL_COUNTER -> fxFullCounter = true;
         }
-        abilMsg = "Used " + ability.displayName + "!"; abilMsgTimer = 120;
+        showPlayerUseDialog(ability.displayName, effect);
         gameState = prevStateBeforePanel;
         autoSave();
+    }
+
+    private void showPlayerUseDialog(String name, String effect) {
+        if (playerDialogImg == null) loadPlayerDialogImages();
+        String who = (player != null) ? capitalize(player.characterName) : "Player";
+        currentDialog = who + " used " + name + ". " + effect;
+        lastNPCColor = 0;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -1076,51 +1233,20 @@ private Rectangle sfxSliderTrack() {
     private void update() {
         talkShake++;
         if (abilMsgTimer > 0) abilMsgTimer--;
-        boolean escNow = keyH.escPressed;
-
-        if (escNow && !escWasHeld) {
-            if (settingsOpen) {
-                settingsOpen = false;
-            } else {
-                switch (gameState) {
-                    case playState -> {
-                        currentDialog = "";
-                        gameState = menuCharState;
-                        stopMusic();
-                        playMusic("menu_sountrack");
-                    }
-                    case menuCharState -> gameState = menuStartState;
-                    case menuStartState -> gameState = menuState;
-                    case creditsState -> gameState = menuState;
-                    case winState -> {
-                        stopMusic();
-                        player = null;
-                        enemyStats = new EnemyStats();
-                        items      = new ItemSystem();
-                        abilities  = new AbilitySystem();
-                        saveData   = null;
-                        new java.io.File(System.getProperty("user.home") + java.io.File.separator + "fivesix_save.dat").delete();
-                        gameState  = menuState;
-                        playMusic("menu_sountrack");
-                    }
-                    case loseState -> {
-                        player = null;
-                        gameState = menuState;
-                        playMusic("menu_sountrack");
-                    }
-                    case inventoryState -> gameState = (prevStateBeforePanel == battleState ? battleState : playState);
-                    case abilityState -> gameState = (prevStateBeforePanel == battleState ? battleState : playState);
-                    case resultState -> { }
-                    default -> { }
-                }
-            }
+        if (quitConfirmOpen) return;
+        if ((gameState == inventoryState || gameState == abilityState) && keyH.ePressed && !eWasPanelHeld) {
+            eWasPanelHeld = true;
+            gameState = prevStateBeforePanel;
+            return;
         }
-        escWasHeld = escNow;
-
+        if (!keyH.ePressed) eWasPanelHeld = false;
         if (gameState == playState && player != null) {
             player.update();
             if (keyH.f1Pressed && !f1WasHeld) { showDebug = !showDebug; f1WasHeld = true; }
             if (!keyH.f1Pressed) f1WasHeld = false;
+        }
+        if (gameState == battleState && !currentDialog.isEmpty() && keyH.ePressed) {
+            currentDialog = "";
         }
         // Narration advance (dedicated state — player cannot move here)
         if (gameState == narrationState) {
@@ -1182,6 +1308,7 @@ private Rectangle sfxSliderTrack() {
             case narrationState -> paintNarration(g2);
             case resultState -> paintResult(g2);
         }
+        if (quitConfirmOpen) paintQuitConfirm(g2);
         g2.dispose();
     }
 
@@ -1190,6 +1317,79 @@ private Rectangle sfxSliderTrack() {
     // ─────────────────────────────────────────────────────────────
     private void fill(Graphics2D g2, BufferedImage im) {
         if (im != null) g2.drawImage(im, 0, 0, getWidth(), getHeight(), null);
+    }
+
+    private Color popupFill() { return new Color(198, 158, 104, 242); }
+    private Color popupBorder() { return new Color(112, 83, 54); }
+    private Color popupRow() { return new Color(226, 190, 134, 235); }
+    private Color popupRowHover() { return new Color(244, 210, 154, 245); }
+    private Font pixelFont(int style, int size) { return new Font("Monospaced", style, size); }
+
+    private void drawPopupBox(Graphics2D g2, int x, int y, int w, int h) {
+        g2.setColor(popupFill());
+        g2.fillRoundRect(x, y, w, h, 10, 10);
+        g2.setColor(popupBorder());
+        g2.setStroke(new BasicStroke(3f));
+        g2.drawRoundRect(x, y, w, h, 10, 10);
+    }
+
+    private void drawImageFit(Graphics2D g2, BufferedImage image, Rectangle box) {
+        if (image == null || box == null || box.width <= 0 || box.height <= 0) return;
+        double scale = Math.min(box.width / (double) image.getWidth(), box.height / (double) image.getHeight());
+        int w = Math.max(1, (int) Math.round(image.getWidth() * scale));
+        int h = Math.max(1, (int) Math.round(image.getHeight() * scale));
+        int x = box.x + (box.width - w) / 2;
+        int y = box.y + (box.height - h) / 2;
+        g2.drawImage(image, x, y, w, h, null);
+    }
+
+    private Rectangle dialogPortraitRect() {
+        return (worldGuiHitbox != null) ? bounds(worldGuiHitbox, BC_CHARDIAL) : null;
+    }
+
+    private boolean drawDialogPortrait(Graphics2D g2, BufferedImage image, Rectangle fallback) {
+        if (image == null) return false;
+        Rectangle dialR = dialogPortraitRect();
+        if (dialR != null) {
+            drawImageFit(g2, image, dialR);
+        } else {
+            drawImageFit(g2, image, fallback);
+        }
+        return true;
+    }
+
+    private Rectangle dialogTextRect(Rectangle box, Rectangle portraitRect, boolean hasPortrait) {
+        int pad = 20;
+        Rectangle text = new Rectangle(box.x + pad, box.y + 40, box.width - pad * 2, box.height - 64);
+        if (!hasPortrait || portraitRect == null || !portraitRect.intersects(box)) return text;
+
+        int leftW = portraitRect.x - text.x - 18;
+        int rightX = portraitRect.x + portraitRect.width + 18;
+        int rightW = text.x + text.width - rightX;
+        if (rightW >= leftW && rightW > 160) {
+            text.x = rightX;
+            text.width = rightW;
+        } else if (leftW > 160) {
+            text.width = leftW;
+        }
+        return text;
+    }
+
+    private boolean isFinalBossLine(String line) {
+        return line.startsWith("Beggar:") || line.startsWith("???:") || line.startsWith(enemyName + ":");
+    }
+
+    private void drawHoverText(Graphics2D g2, String text) {
+        if (text == null || text.isBlank()) return;
+        int tw = 500, th = 96, tx = getWidth() / 2 - tw / 2, ty = getHeight() - th - 34;
+        drawPopupBox(g2, tx, ty, tw, th);
+        g2.setFont(pixelFont(Font.BOLD, 16));
+        g2.setColor(new Color(56, 36, 24));
+        int y = ty + 30;
+        for (String ln : wrap(g2, text, tw - 32)) {
+            g2.drawString(ln, tx + 16, y);
+            y += 22;
+        }
     }
 
     /** Draw a button image (idle or hover) stretched to fill its hitbox color region */
@@ -1202,6 +1402,20 @@ private Rectangle sfxSliderTrack() {
         if (bim == null) return;
         Rectangle r = bounds(hb, color);
         if (r != null) g2.drawImage(bim, r.x, r.y, r.width, r.height, null);
+    }
+
+    private void drawBattleMoveBtn(Graphics2D g2, int color, String key, Dimension size) {
+        BufferedImage[] arr = btnImgs.get(key);
+        if (arr == null || battleHitbox == null) return;
+        Rectangle r = bounds(battleHitbox, color);
+        if (r == null) return;
+        BufferedImage bim = (key.equals(hoveredBtn) && arr[1] != null) ? arr[1] : arr[0];
+        if (bim == null) return;
+        int w = Math.min(r.width, size.width);
+        int h = Math.min(r.height, size.height);
+        int x = r.x + (r.width - w) / 2;
+        int y = r.y + (r.height - h) / 2;
+        g2.drawImage(bim, x, y, w, h, null);
     }
 
     // Cache bounds lookups — recomputed only when screen size changes
@@ -1246,8 +1460,7 @@ private Rectangle sfxSliderTrack() {
 
     private void dialog(Graphics2D g2, String text) {
         int bx=60, by=getHeight()-200, bw=getWidth()-120, bh=150;
-        g2.setColor(new Color(0,0,0,210)); g2.fillRoundRect(bx,by,bw,bh,25,25);
-        g2.setColor(Color.WHITE); g2.setStroke(new BasicStroke(3)); g2.drawRoundRect(bx,by,bw,bh,25,25);
+        drawPopupBox(g2,bx,by,bw,bh);
 
         // Portrait — stretched to fit #6377FF region in worldGuiHitbox if available,
         // otherwise fall back to fixed position inside dialog box
@@ -1259,24 +1472,40 @@ private Rectangle sfxSliderTrack() {
             port = playerDialogImg;
         }
 
-        if (port != null) {
-            // Try to draw in the BC_CHARDIAL hitbox region (world gui)
-            Rectangle dialR = (worldGuiHitbox != null) ? bounds(worldGuiHitbox, BC_CHARDIAL) : null;
-            if (dialR != null) {
-                g2.drawImage(port, dialR.x, dialR.y, dialR.width, dialR.height, null);
-            } else {
-                // Fallback: draw inside dialog box with shake
-                int shX = (talkShake%6<3)?2:-2;
-                g2.drawImage(port, bx+12+shX, by+(bh-110)/2, 80, 110, null);
-            }
-        }
+        Rectangle fallbackPort = new Rectangle(bx + 12, by + (bh - 110) / 2, 80, 110);
+        boolean hasPortrait = drawDialogPortrait(g2, port, fallbackPort);
 
-        g2.setFont(new Font("Arial",Font.BOLD,21)); g2.setColor(Color.WHITE);
-        int tx = (port != null && bounds(worldGuiHitbox, BC_CHARDIAL) == null) ? bx+110 : bx+20;
-        int ty=by+48, mw=bw - (tx - bx) - 20;
-        for (String ln : wrap(g2,text,mw)) { g2.drawString(ln,tx,ty); ty+=30; }
-        g2.setFont(new Font("Arial",Font.ITALIC,16)); g2.setColor(new Color(180,180,180));
+        Rectangle dialogBox = new Rectangle(bx, by, bw, bh);
+        Rectangle dialR = dialogPortraitRect();
+        Rectangle portraitRect = (dialR != null) ? dialR : fallbackPort;
+        Rectangle textRect = dialogTextRect(dialogBox, portraitRect, hasPortrait);
+        textRect.y = by + 18;
+        textRect.height = bh - 52;
+        drawDialogText(g2, text, textRect);
+        g2.setFont(pixelFont(Font.ITALIC,16)); g2.setColor(new Color(80, 56, 38));
         g2.drawString("Press 'E' to continue...", bx+bw-260, by+bh-18);
+    }
+
+    private void drawDialogText(Graphics2D g2, String text, Rectangle textRect) {
+        int size = 21;
+        List<String> lines;
+        FontMetrics fm;
+        do {
+            g2.setFont(pixelFont(Font.BOLD, size));
+            fm = g2.getFontMetrics();
+            lines = wrap(g2, text, textRect.width);
+            if (lines.size() * (fm.getHeight() + 3) <= textRect.height || size <= 15) break;
+            size--;
+        } while (true);
+
+        g2.setColor(new Color(52, 35, 24));
+        int lineH = fm.getHeight() + 3;
+        int y = textRect.y + fm.getAscent();
+        for (String ln : lines) {
+            if (y > textRect.y + textRect.height) break;
+            g2.drawString(ln, textRect.x, y);
+            y += lineH;
+        }
     }
 
     private List<String> wrap(Graphics2D g2, String text, int maxW) {
@@ -1328,6 +1557,7 @@ private Rectangle sfxSliderTrack() {
 
     private void paintMenuStart(Graphics2D g2) {
         fill(g2, menuScreenImg);
+        drawLogo(g2, menuStartHitbox);
         drawBtn(g2, menuStartHitbox, BC_CONTINUE, "continue");
         drawBtn(g2, menuStartHitbox, BC_SELCHAR,  "selchar");
         drawBtn(g2, menuStartHitbox, BC_SETTINGS, "settings");
@@ -1336,13 +1566,14 @@ private Rectangle sfxSliderTrack() {
 
     private void paintCharSelect(Graphics2D g2) {
         fill(g2, menuScreenImg);
+        drawLogo(g2, menuCharHitbox);
 
         for (String name : List.of("ivan", "sam", "nimuel", "johnfiel")) {
             BufferedImage[] arr = btnImgs.get(name);
-            Rectangle r = charButtonRect(name);
+            Rectangle r = charButtonDrawRect(name);
             if (arr == null || r == null) continue;
             BufferedImage img = name.equals(hoveredBtn) && arr[1] != null ? arr[1] : arr[0];
-            if (img != null) g2.drawImage(img, r.x, r.y, r.width, r.height, null);
+            if (img != null) drawImageFit(g2, img, r);
         }
 
         String hcn = charName(hoveredCharColor);
@@ -1367,6 +1598,12 @@ private Rectangle sfxSliderTrack() {
         // Intentionally no hover text overlay here (no "TANK/HP/DMG" labels).
     }
 
+    private void drawLogo(Graphics2D g2, BufferedImage hitbox) {
+        if (logoImg == null || hitbox == null) return;
+        Rectangle lr = bounds(hitbox, BC_LOGO);
+        if (lr != null) g2.drawImage(logoImg, lr.x, lr.y, lr.width, lr.height, null);
+    }
+
     private void drawOutlinedText(Graphics2D g2, String text, int centerX, int y, Font font) {
         if (text == null || text.isEmpty()) return;
         g2.setFont(font);
@@ -1383,35 +1620,27 @@ private Rectangle sfxSliderTrack() {
     }
 
     private void paintCredits(Graphics2D g2) {
-        fill(g2, menuScreenImg);
-        g2.setColor(new Color(0,0,0,200)); g2.fillRect(0,0,getWidth(),getHeight());
-        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,48));
-        String t="CREDITS"; g2.drawString(t,getWidth()/2-g2.getFontMetrics().stringWidth(t)/2,100);
-        g2.setFont(new Font("Arial",Font.PLAIN,28));
-        int y=180;
-        for (String n : new String[]{"Developer Team","","Ivan","Nimuel","Sam","Johnfiel","","Press ESC to go back"}) {
-            g2.drawString(n,getWidth()/2-g2.getFontMetrics().stringWidth(n)/2,y); y+=44;
+        if (creditsImg != null) {
+            fill(g2, creditsImg);
+            return;
         }
+        drawPlaceholderScreen(g2, "CREDITS PLACEHOLDER");
     }
 
     private void paintSettingsPanel(Graphics2D g2) {
     Rectangle panel = settingsPanelRect();
     int px = panel.x, py = panel.y, pw = panel.width, ph = panel.height;
 
-    g2.setColor(new Color(20, 20, 40, 245));
-    g2.fillRoundRect(px, py, pw, ph, 20, 20);
-    g2.setColor(new Color(100, 150, 255));
-    g2.setStroke(new BasicStroke(2));
-    g2.drawRoundRect(px, py, pw, ph, 20, 20);
+    drawPopupBox(g2, px, py, pw, ph);
 
     // Title
-    g2.setColor(Color.WHITE);
-    g2.setFont(new Font("Arial", Font.BOLD, 26));
+    g2.setColor(new Color(52, 35, 24));
+    g2.setFont(pixelFont(Font.BOLD, 26));
     String title = "SETTINGS";
     g2.drawString(title, px + pw/2 - g2.getFontMetrics().stringWidth(title)/2, py + 40);
 
     // Divider
-    g2.setColor(new Color(100, 150, 255, 100));
+    g2.setColor(new Color(112, 83, 54, 120));
     g2.setStroke(new BasicStroke(1f));
     g2.drawLine(px + 20, py + 50, px + pw - 20, py + 50);
 
@@ -1424,8 +1653,8 @@ private Rectangle sfxSliderTrack() {
         Rectangle muteRect = settingsMuteRect();
         g2.drawImage(muteImg, muteRect.x, muteRect.y, muteRect.width, muteRect.height, null);
     }
-    g2.setColor(Color.WHITE);
-    g2.setFont(new Font("Arial", Font.PLAIN, 18));
+    g2.setColor(new Color(52, 35, 24));
+    g2.setFont(pixelFont(Font.PLAIN, 18));
     g2.drawString(isMuted ? "Unmute" : "Mute", px + 190, py + 88);
 
     // Music volume slider
@@ -1435,44 +1664,81 @@ private Rectangle sfxSliderTrack() {
     drawSlider(g2, px + 30, py + 190, pw - 60, "SFX Volume", sfxVolume);
 
     // Dismiss hint
-    g2.setFont(new Font("Arial", Font.ITALIC, 13));
-    g2.setColor(new Color(150, 150, 150));
+    g2.setFont(pixelFont(Font.ITALIC, 13));
+    g2.setColor(new Color(80, 56, 38));
     String hint = "Click outside to close  |  Drag sliders to adjust";
     g2.drawString(hint, px + pw/2 - g2.getFontMetrics().stringWidth(hint)/2, py + ph - 12);
 }
 
 private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float value) {
     // Label
-    g2.setFont(new Font("Arial", Font.BOLD, 16));
-    g2.setColor(new Color(200, 200, 255));
+    g2.setFont(pixelFont(Font.BOLD, 16));
+    g2.setColor(new Color(52, 35, 24));
     g2.drawString(label, x, y);
 
     int sy = y + 14;
     int sh = 8;
 
     // Track background
-    g2.setColor(new Color(60, 60, 90));
+    g2.setColor(new Color(146, 106, 68));
     g2.fillRoundRect(x, sy, w, sh, sh, sh);
 
     // Filled portion
     int filled = (int)(w * value);
-    g2.setColor(new Color(100, 150, 255));
+    g2.setColor(new Color(92, 66, 42));
     g2.fillRoundRect(x, sy, filled, sh, sh, sh);
 
     // Thumb
     int thumbX = x + filled - 8;
     int thumbY = sy - 6;
-    g2.setColor(new Color(180, 210, 255));
+    g2.setColor(new Color(244, 210, 154));
     g2.fillOval(thumbX, thumbY, 20, 20);
-    g2.setColor(new Color(100, 150, 255));
+    g2.setColor(popupBorder());
     g2.setStroke(new BasicStroke(2f));
     g2.drawOval(thumbX, thumbY, 20, 20);
 
     // Percentage
-    g2.setFont(new Font("Arial", Font.PLAIN, 14));
-    g2.setColor(new Color(180, 180, 180));
+    g2.setFont(pixelFont(Font.PLAIN, 14));
+    g2.setColor(new Color(80, 56, 38));
     g2.drawString((int)(value * 100) + "%", x + w + 8, sy + sh);
 }
+
+    private void paintQuitConfirm(Graphics2D g2) {
+        g2.setColor(new Color(0, 0, 0, 130));
+        g2.fillRect(0, 0, getWidth(), getHeight());
+
+        Rectangle box = quitConfirmRect();
+        drawPopupBox(g2, box.x, box.y, box.width, box.height);
+
+        g2.setColor(new Color(52, 35, 24));
+        g2.setFont(pixelFont(Font.BOLD, 26));
+        String title = quitConfirmToMenu ? "QUIT TO MENU?" : "QUIT GAME?";
+        g2.drawString(title, box.x + box.width / 2 - g2.getFontMetrics().stringWidth(title) / 2, box.y + 46);
+
+        g2.setColor(new Color(112, 83, 54, 120));
+        g2.setStroke(new BasicStroke(1f));
+        g2.drawLine(box.x + 24, box.y + 60, box.x + box.width - 24, box.y + 60);
+
+        g2.setColor(new Color(80, 56, 38));
+        g2.setFont(pixelFont(Font.BOLD, 18));
+        String msg = quitConfirmToMenu ? "Save and return to the main menu?" : "Are you sure you want to close Five-Six?";
+        g2.drawString(msg, box.x + box.width / 2 - g2.getFontMetrics().stringWidth(msg) / 2, box.y + 104);
+
+        drawTextButton(g2, quitYesRect(), "YES");
+        drawTextButton(g2, quitNoRect(), "NO");
+    }
+
+    private void drawTextButton(Graphics2D g2, Rectangle r, String label) {
+        boolean hovered = r.contains(mouse);
+        g2.setColor(hovered ? popupRowHover() : popupRow());
+        g2.fillRoundRect(r.x, r.y, r.width, r.height, 8, 8);
+        g2.setColor(popupBorder());
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(r.x, r.y, r.width, r.height, 8, 8);
+        g2.setColor(new Color(52, 35, 24));
+        g2.setFont(pixelFont(Font.BOLD, 20));
+        g2.drawString(label, r.x + r.width / 2 - g2.getFontMetrics().stringWidth(label) / 2, r.y + 29);
+    }
 
     private void drawMenuSettingsButton(Graphics2D g2) {
         BufferedImage[] imgs = btnImgs.get("settings");
@@ -1553,7 +1819,10 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
     }
 
     private Rectangle settingsWorldRect() {
-        return bounds(worldGuiHitbox, BC_MUTE);
+        Rectangle r = bounds(worldGuiHitbox, BC_MUTE);
+        if (r == null) return null;
+        int w = Math.min(r.width, Math.max(1, (int)(r.height * 2.4)));
+        return new Rectangle(r.x + (r.width - w) / 2, r.y, w, r.height);
     }
 
     private void drawMapTitle(Graphics2D g2) {
@@ -1655,26 +1924,17 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
         hpBar(g2, getWidth()-360, 30, 300, 22, enemyHP, enemyMaxHP, enemyName);
         // Buttons (from battle_hitbox) — only show when player's turn
         if (!waitingOutcome) {
-            drawBtn(g2, battleHitbox, BC_ROCKBTN,  "rock");
-            drawBtn(g2, battleHitbox, BC_PAPERBTN, "paper");
-            drawBtn(g2, battleHitbox, BC_SCISSBTN, "scissors");
+            Dimension moveSize = battleMoveButtonSize();
+            drawBattleMoveBtn(g2, BC_ROCKBTN,  "rock", moveSize);
+            drawBattleMoveBtn(g2, BC_PAPERBTN, "paper", moveSize);
+            drawBattleMoveBtn(g2, BC_SCISSBTN, "scissors", moveSize);
             drawBtn(g2, battleHitbox, BC_USEITEM,  "useitem");
             drawBtn(g2, battleHitbox, BC_USEABIL,  "useabil");
         }
         // Active effects
-        int ey=90; g2.setFont(new Font("Arial",Font.BOLD,17));
-        for (String fx : activeEffects()) {
-            g2.setColor(new Color(80,255,180)); g2.drawString(fx,40,ey); ey+=24;
-        }
-        // Ability message
-        if (abilMsgTimer>0) {
-            g2.setFont(new Font("Arial",Font.BOLD,28));
-            g2.setColor(new Color(100,255,150));
-            int aw=g2.getFontMetrics().stringWidth(abilMsg);
-            g2.drawString(abilMsg, getWidth()/2-aw/2, getHeight()/2-40);
-        }
+        drawActiveEffects(g2);
         // Clairvoyance
-        if (clairVisible) {
+        if (false && clairVisible) {
             // Persistent prediction banner — stays until the player picks a move
             g2.setColor(new Color(30, 10, 80, 220));
             g2.fillRoundRect(getWidth()/2 - 280, 18, 560, 48, 16, 16);
@@ -1686,17 +1946,58 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
             String ct = clairText;
             g2.drawString(ct, getWidth()/2 - g2.getFontMetrics().stringWidth(ct)/2, 50);
         }
+        if (!currentDialog.isEmpty()) dialog(g2, currentDialog);
     }
 
     private List<String> activeEffects() {
         List<String> out=new ArrayList<>();
+        if(clairVisible && clairMove != null) {
+            String moveName = switch (clairMove) {
+                case ROCK -> "Rock";
+                case PAPER -> "Paper";
+                case SCISSORS -> "Scissors";
+            };
+            out.add("Clairvoyance: " + moveName);
+        }
         if(fxUnoReverse)   out.add("Uno Reverse: ON");
         if(fxHypnotize)    out.add("Hypnotize: ON");
         if(fxYouCheater)   out.add("You Cheater: ON");
         if(fxFullCounter)  out.add("Full Counter: ON");
         if(fxHealRounds>0) out.add("Ticking Heal: "+fxHealRounds+" rounds");
-        if(fxEnergyRounds>0) out.add("Energy Drink: "+fxEnergyRounds+" rounds");
         return out;
+    }
+
+    private void drawActiveEffects(Graphics2D g2) {
+        List<String> effects = activeEffects();
+        if (effects.isEmpty()) return;
+        int w = 260;
+        int h = 34 + effects.size() * 24;
+        int x = 32;
+        int y = 76;
+        drawPopupBox(g2, x, y, w, h);
+        g2.setFont(pixelFont(Font.BOLD, 15));
+        g2.setColor(new Color(52, 35, 24));
+        g2.drawString("ACTIVE", x + 16, y + 24);
+        g2.setFont(pixelFont(Font.BOLD, 14));
+        int ty = y + 50;
+        for (String fx : effects) {
+            g2.drawString(fx, x + 16, ty);
+            ty += 24;
+        }
+    }
+
+    private Dimension battleMoveButtonSize() {
+        Rectangle r = bounds(battleHitbox, BC_ROCKBTN);
+        Rectangle p = bounds(battleHitbox, BC_PAPERBTN);
+        Rectangle s = bounds(battleHitbox, BC_SCISSBTN);
+        int w = Integer.MAX_VALUE, h = Integer.MAX_VALUE;
+        for (Rectangle rect : new Rectangle[]{r, p, s}) {
+            if (rect == null) continue;
+            w = Math.min(w, rect.width);
+            h = Math.min(h, rect.height);
+        }
+        if (w == Integer.MAX_VALUE || h == Integer.MAX_VALUE) return new Dimension(1, 1);
+        return new Dimension(w, h);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -1741,24 +2042,24 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
         g2.setColor(new Color(0,0,0,100));
         g2.fillRect(0,0,getWidth(),getHeight());
     }
-    boolean inBattle = prevStateBeforePanel == battleState;
     int pw=520,ph=420,px=getWidth()/2-pw/2,py=getHeight()/2-ph/2;
     panel(g2,px,py,pw,ph,"ITEMS");
     List<ItemSystem.Item> list = items.getItems();
-    int iy=py+72; g2.setFont(new Font("Arial",Font.PLAIN,20));
+    int iy=py+88; g2.setFont(pixelFont(Font.BOLD,20));
+    String hoverText = null;
     for (ItemSystem.Item item : list) {
         int cnt = items.count(item);
         boolean h = new Rectangle(px+20,iy-28,pw-40,38).contains(mouse);
-        g2.setColor(h ? new Color(90,90,180) : new Color(40,40,100));
+        if (h) hoverText = item.displayName + ": " + item.description;
+        g2.setColor(h ? popupRowHover() : popupRow());
         g2.fillRoundRect(px+20,iy-28,pw-40,38,8,8);
-        g2.setColor(Color.WHITE);
-        g2.drawString("x"+cnt+"  "+item.displayName+" — "+item.description, px+34, iy);
+        g2.setColor(new Color(52, 35, 24));
+        String label = item.displayName + "  x" + cnt;
+        g2.drawString(label, px + pw / 2 - g2.getFontMetrics().stringWidth(label) / 2, iy);
         iy+=48; if(iy>py+ph-44) break;
     }
-    if (list.isEmpty()) { g2.setColor(new Color(180,180,180)); g2.setFont(new Font("Arial",Font.ITALIC,22)); g2.drawString("No items",px+pw/2-44,py+ph/2); }
-    g2.setColor(new Color(160,160,160)); g2.setFont(new Font("Arial",Font.ITALIC,15));
-    String hint = "Click item to use  |  ESC to close";
-    g2.drawString(hint, px+32, py+ph-14);
+    if (list.isEmpty()) { g2.setColor(new Color(80,56,38)); g2.setFont(pixelFont(Font.ITALIC,22)); g2.drawString("No items",px+pw/2-44,py+ph/2); }
+    drawHoverText(g2, hoverText);
 }
 
     private void paintAbility(Graphics2D g2) {
@@ -1772,50 +2073,45 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
     boolean inBattle = prevStateBeforePanel == battleState;
     int pw = 560, ph = 440, px = getWidth()/2 - pw/2, py = getHeight()/2 - ph/2;
 
-    g2.setColor(new Color(30, 25, 80));
-    g2.fillRoundRect(px, py, pw, ph, 18, 18);
-    g2.setColor(new Color(120, 180, 255));
-    g2.setStroke(new BasicStroke(3));
-    g2.drawRoundRect(px, py, pw, ph, 18, 18);
+    drawPopupBox(g2, px, py, pw, ph);
 
-    g2.setColor(Color.WHITE);
-    g2.setFont(new Font("Arial", Font.BOLD, 28));
+    g2.setColor(new Color(52, 35, 24));
+    g2.setFont(pixelFont(Font.BOLD, 28));
     String title = "ABILITIES";
     g2.drawString(title, px + pw/2 - g2.getFontMetrics().stringWidth(title)/2, py + 42);
 
-    g2.setColor(new Color(80, 100, 200));
+    g2.setColor(new Color(112, 83, 54, 120));
     g2.setStroke(new BasicStroke(1));
     g2.drawLine(px + 20, py + 54, px + pw - 20, py + 54);
 
     List<AbilitySystem.Ability> unique = abilities.getUnique();
     int ay = py + 88;
-    g2.setFont(new Font("Arial", Font.PLAIN, 18));
+    g2.setFont(pixelFont(Font.BOLD, 18));
+    String hoverText = null;
     for (AbilitySystem.Ability ab : unique) {
         int cnt = abilities.count(ab);
         boolean hovered = inBattle && new Rectangle(px+16, ay-26, pw-32, 36).contains(mouse);
-        g2.setColor(hovered ? new Color(80, 80, 200) : new Color(50, 45, 120));
+        if (hovered) hoverText = ab.displayName + ": " + ab.description;
+        g2.setColor(hovered ? popupRowHover() : popupRow());
         g2.fillRoundRect(px+16, ay-26, pw-32, 36, 8, 8);
-        g2.setColor(inBattle ? Color.WHITE : new Color(190, 190, 190));
-        g2.drawString("x" + cnt + "  " + ab.displayName + " — " + ab.description, px + 28, ay);
+        g2.setColor(inBattle ? new Color(52,35,24) : new Color(96,76,58));
+        String label = ab.displayName + "  x" + cnt;
+        g2.drawString(label, px + pw / 2 - g2.getFontMetrics().stringWidth(label) / 2, ay);
         ay += 46;
         if (ay > py + ph - 40) break;
     }
     if (unique.isEmpty()) {
-        g2.setColor(new Color(160, 160, 160));
-        g2.setFont(new Font("Arial", Font.ITALIC, 20));
+        g2.setColor(new Color(80,56,38));
+        g2.setFont(pixelFont(Font.ITALIC, 20));
         g2.drawString("No abilities", px + pw/2 - 55, py + ph/2);
     }
 
-    g2.setColor(new Color(130, 130, 130));
-    g2.setFont(new Font("Arial", Font.ITALIC, 14));
-    String hint = inBattle ? "Click an ability to use it  |  ESC to close" : "View only outside battle  |  ESC to close";
-    g2.drawString(hint, px + 20, py + ph - 12);
+    drawHoverText(g2, hoverText);
 }
 
     private void panel(Graphics2D g2, int px, int py, int pw, int ph, String title) {
-        g2.setColor(new Color(10,10,30,240)); g2.fillRoundRect(px,py,pw,ph,20,20);
-        g2.setColor(new Color(100,150,255)); g2.setStroke(new BasicStroke(2)); g2.drawRoundRect(px,py,pw,ph,20,20);
-        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,30));
+        drawPopupBox(g2, px, py, pw, ph);
+        g2.setColor(new Color(52,35,24)); g2.setFont(pixelFont(Font.BOLD,30));
         g2.drawString(title, px+pw/2-g2.getFontMetrics().stringWidth(title)/2, py+44);
     }
 
@@ -1838,35 +2134,32 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
 
         // Dialog box at bottom
         String line = currentDialog;
-        boolean isPlayerLine = line.startsWith("Player");
-        boolean isNarLine    = !line.contains(":") || line.startsWith("The ");
+        String playerFirst = (player != null) ? capitalize(player.characterName) : "Player";
+        boolean isPlayerLine = line.startsWith(playerFirst + ":");
+        boolean isBossLine = isFinalBossLine(line);
 
         int bx = 50, by = getHeight() - 210, bw = getWidth() - 100, bh = 165;
-        g2.setColor(new Color(0, 0, 0, 210));
-        g2.fillRoundRect(bx, by, bw, bh, 22, 22);
-        g2.setColor(isNarLine ? new Color(220, 200, 80) : Color.WHITE);
-        g2.setStroke(new BasicStroke(2.5f));
-        g2.drawRoundRect(bx, by, bw, bh, 22, 22);
+        drawPopupBox(g2, bx, by, bw, bh);
 
-        // Portrait on left if it's the player speaking
-        int textX = bx + 20;
-        if (isPlayerLine && playerDialogImg != null) {
-            g2.drawImage(playerDialogImg, bx + 14, by + (bh - 115) / 2, 82, 115, null);
-            textX = bx + 108;
-        }
+        BufferedImage port = isPlayerLine ? playerDialogImg : (isBossLine ? enemyDialogImg : null);
+        Rectangle dialogBox = new Rectangle(bx, by, bw, bh);
+        Rectangle fallbackPort = new Rectangle(bx + 14, by + (bh - 115) / 2, 82, 115);
+        boolean hasPortrait = drawDialogPortrait(g2, port, fallbackPort);
+        Rectangle portraitRect = dialogPortraitRect() != null ? dialogPortraitRect() : fallbackPort;
+        Rectangle textRect = dialogTextRect(dialogBox, portraitRect, hasPortrait);
 
         // Text
-        g2.setFont(new Font("Arial", Font.BOLD, 20));
-        g2.setColor(Color.WHITE);
-        int ty = by + 52;
-        for (String ln : wrap(g2, line, bw - (textX - bx) - 24)) {
-            g2.drawString(ln, textX, ty);
+        g2.setFont(pixelFont(Font.BOLD, 20));
+        g2.setColor(new Color(52, 35, 24));
+        int ty = textRect.y + 12;
+        for (String ln : wrap(g2, line, textRect.width)) {
+            g2.drawString(ln, textRect.x, ty);
             ty += 34;
         }
 
         // Prompt
-        g2.setFont(new Font("Arial", Font.ITALIC, 16));
-        g2.setColor(new Color(170, 170, 170));
+        g2.setFont(pixelFont(Font.ITALIC, 16));
+        g2.setColor(new Color(80, 56, 38));
         boolean isLast = narIndex >= narLines.length - 1;
         String prompt = isLast ? "Press 'E' to start the fight!" : "Press 'E' to continue...";
         g2.drawString(prompt, bx + bw - 285, by + bh - 14);
@@ -1904,52 +2197,54 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
         // Choose portrait: player speaks on even lines, enemy on odd lines
         // last line (narration) shows no portrait
         boolean isNarration = line.startsWith("—") || line.startsWith("-");
-        boolean isPlayerLine = !isNarration && preBattleIndex % 2 == 0;
+        String playerFirst = (player != null) ? capitalize(player.characterName) : "Player";
+        boolean isPlayerLine = !isNarration && line.startsWith(playerFirst + ":");
+        boolean isBossLine = !isNarration && isFinalBossLine(line);
 
         int bx = 60, by = getHeight() - 200, bw = getWidth() - 120, bh = 150;
-        g2.setColor(new Color(0, 0, 0, 220)); g2.fillRoundRect(bx, by, bw, bh, 25, 25);
-        g2.setColor(isNarration ? new Color(180, 180, 80) : Color.WHITE);
-        g2.setStroke(new BasicStroke(3)); g2.drawRoundRect(bx, by, bw, bh, 25, 25);
+        drawPopupBox(g2, bx, by, bw, bh);
 
         // Portrait
-        BufferedImage port = isPlayerLine ? playerDialogImg : (isNarration ? null : enemyDialogImg);
-        int textX = bx + 20;
-        if (port != null) {
-            int shX = (talkShake % 6 < 3) ? 2 : -2;
-            g2.drawImage(port, bx + 12 + shX, by + (bh - 110) / 2, 80, 110, null);
-            textX = bx + 110;
-        }
+        BufferedImage port = isPlayerLine ? playerDialogImg : (isBossLine ? enemyDialogImg : null);
+        Rectangle dialogBox = new Rectangle(bx, by, bw, bh);
+        Rectangle fallbackPort = new Rectangle(bx + 12, by + (bh - 110) / 2, 80, 110);
+        boolean hasPortrait = drawDialogPortrait(g2, port, fallbackPort);
+        Rectangle portraitRect = dialogPortraitRect() != null ? dialogPortraitRect() : fallbackPort;
+        Rectangle textRect = dialogTextRect(dialogBox, portraitRect, hasPortrait);
 
         // Dialogue text
-        g2.setFont(new Font("Arial", Font.BOLD, 20));
-        g2.setColor(Color.WHITE);
-        int ty = by + 50;
-        int maxW = bw - (textX - bx) - 20;
-        for (String ln : wrap(g2, line, maxW)) {
-            g2.drawString(ln, textX, ty); ty += 32;
+        g2.setFont(pixelFont(Font.BOLD, 20));
+        g2.setColor(new Color(52, 35, 24));
+        int ty = textRect.y + 10;
+        for (String ln : wrap(g2, line, textRect.width)) {
+            g2.drawString(ln, textRect.x, ty); ty += 32;
         }
 
         // Prompt
-        g2.setFont(new Font("Arial", Font.ITALIC, 16));
-        g2.setColor(new Color(180, 180, 180));
+        g2.setFont(pixelFont(Font.ITALIC, 16));
+        g2.setColor(new Color(80, 56, 38));
         boolean isLast = preBattleIndex >= preBattleLines.length - 1;
         String prompt = isLast ? "Press 'E' to begin the battle!" : "Press 'E' to continue...";
         g2.drawString(prompt, bx + bw - 280, by + bh - 18);
     }
 
     private void paintWin(Graphics2D g2) {
-        g2.setColor(Color.BLACK); g2.fillRect(0,0,getWidth(),getHeight());
-        if (player != null) { BufferedImage wi = charSelectImg.get(player.characterName); if(wi!=null) fill(g2,wi); }
-        g2.setColor(new Color(0,0,0,160)); g2.fillRect(0,getHeight()-200,getWidth(),200);
-        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,26));
-        String txt="After that weird encounter you finally get to enjoy your long awaited meal at Jollibee!!";
-        int ty=getHeight()-170;
-        for (String ln : wrap(g2,txt,getWidth()-80)) {
-            g2.drawString(ln,getWidth()/2-g2.getFontMetrics().stringWidth(ln)/2,ty); ty+=38;
+        if (winImg != null) {
+            fill(g2, winImg);
+            return;
         }
-        g2.setFont(new Font("Arial",Font.ITALIC,20)); g2.setColor(new Color(200,200,200));
-        String back="Press ESC to return to menu";
-        g2.drawString(back,getWidth()/2-g2.getFontMetrics().stringWidth(back)/2,getHeight()-55);
+        drawPlaceholderScreen(g2, "WIN SCREEN PLACEHOLDER");
+    }
+
+    private void drawPlaceholderScreen(Graphics2D g2, String title) {
+        g2.setColor(new Color(198, 158, 104));
+        g2.fillRect(0, 0, getWidth(), getHeight());
+        g2.setColor(new Color(112, 83, 54));
+        g2.setStroke(new BasicStroke(8f));
+        g2.drawRect(28, 28, getWidth() - 56, getHeight() - 56);
+        g2.setFont(pixelFont(Font.BOLD, 48));
+        g2.setColor(new Color(52, 35, 24));
+        g2.drawString(title, getWidth()/2 - g2.getFontMetrics().stringWidth(title)/2, getHeight()/2);
     }
 
     private void paintLose(Graphics2D g2) {
@@ -1972,7 +2267,7 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
         g2.drawString(sub, getWidth()/2 - g2.getFontMetrics().stringWidth(sub)/2, getHeight()/2 + 55);
         // Prompt
         g2.setFont(new Font("Arial", Font.ITALIC, 18)); g2.setColor(new Color(160,160,160));
-        String back = "Press ESC to return to the main menu and start over";
+        String back = "Click to return to the main menu and start over";
         g2.drawString(back, getWidth()/2 - g2.getFontMetrics().stringWidth(back)/2, getHeight()-55);
     }
 
@@ -2015,11 +2310,7 @@ int bx = getWidth() / 2 - bw / 2;
 int by = getHeight() / 2 - bh / 2;
 
 // Panel background
-g2.setColor(new Color(15, 20, 15, 250));
-g2.fillRoundRect(bx, by, bw, bh, 20, 20);
-g2.setColor(new Color(255, 215, 0));
-g2.setStroke(new BasicStroke(3f));
-g2.drawRoundRect(bx, by, bw, bh, 20, 20);
+drawPopupBox(g2, bx, by, bw, bh);
 
 // "YOU WIN!" header — clean gold, no glow blob
 g2.setFont(new Font("Arial", Font.BOLD, 46));
@@ -2029,11 +2320,11 @@ String win = "YOU WIN!";
 g2.setColor(new Color(0, 0, 0, 180));
 g2.drawString(win, bx + bw/2 - fmw.stringWidth(win)/2 + 3, by + 56 + 3);
 // Gold text
-g2.setColor(new Color(255, 215, 0));
+g2.setColor(new Color(52, 35, 24));
 g2.drawString(win, bx + bw/2 - fmw.stringWidth(win)/2, by + 56);
 
 // Divider
-g2.setColor(new Color(255, 215, 0, 120));
+g2.setColor(new Color(112, 83, 54, 120));
 g2.setStroke(new BasicStroke(1f));
 g2.drawLine(bx + 20, by + 68, bx + bw - 20, by + 68);
 
