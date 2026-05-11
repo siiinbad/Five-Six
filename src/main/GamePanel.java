@@ -55,6 +55,7 @@ public class GamePanel extends JPanel implements Runnable {
     public static final int loseState      = 11;
     public static final int preBattleState = 12;
     public static final int narrationState = 13;
+    public static final int resultState = 14;
 
     // HITBOX IMAGES (reused, small files kept in RAM)
     private BufferedImage menuMainHitbox;
@@ -99,7 +100,8 @@ public class GamePanel extends JPanel implements Runnable {
     private String musicTrack   = "";
     private Thread musicThread  = null;
     private volatile boolean stopMusicRequested = false;
-    private volatile javazoom.jl.player.Player activeMusicPlayer = null;
+    public float musicVolume = 0.5f;  // 0.0 to 1.0
+    public float sfxVolume   = 0.8f;  // 0.0 to 1.0
 
     // SAVE
     private SaveData saveData = null;
@@ -152,6 +154,9 @@ public class GamePanel extends JPanel implements Runnable {
     private AbilitySystem abilities = new AbilitySystem();
     private String abilMsg          = "";
     private int    abilMsgTimer     = 0;
+    private List<String> lastRewardItems    = new ArrayList<>();
+    private List<String> lastRewardAbils    = new ArrayList<>();
+    private boolean      showRewardsBox     = false;
 
     // ACTIVE EFFECTS
     private boolean fxUnoReverse   = false;
@@ -187,6 +192,7 @@ public class GamePanel extends JPanel implements Runnable {
         ToolTipManager.sharedInstance().setEnabled(false);
 
         loadAll();
+        debugAudio();
         saveData = SaveData.loadFromDisk();  // restore save across sessions
         playMusic("menu_sountrack");
 
@@ -194,12 +200,33 @@ public class GamePanel extends JPanel implements Runnable {
             @Override public void mousePressed(MouseEvent e) { onClick(e.getPoint()); }
         });
         addMouseMotionListener(new MouseAdapter() {
-            @Override public void mouseMoved(MouseEvent e) {
-                mouse = e.getPoint();
-                refreshHover();
-                repaint();
+    @Override public void mouseMoved(MouseEvent e) {
+        mouse = e.getPoint();
+        refreshHover();
+        repaint();
+    }
+    @Override public void mouseDragged(MouseEvent e) {
+        mouse = e.getPoint();
+        if (settingsOpen) {
+            if (musicSliderTrack().contains(e.getPoint()) ||
+                (e.getPoint().y >= musicSliderTrack().y && e.getPoint().y <= musicSliderTrack().y + 16)) {
+                Rectangle t = musicSliderTrack();
+                if (e.getPoint().x >= t.x && e.getPoint().x <= t.x + t.width) {
+                    musicVolume = sliderValue(t, e.getPoint());
+                    applyMusicVolume();
+                }
             }
-        });
+            if (sfxSliderTrack().contains(e.getPoint()) ||
+                (e.getPoint().y >= sfxSliderTrack().y && e.getPoint().y <= sfxSliderTrack().y + 16)) {
+                Rectangle t = sfxSliderTrack();
+                if (e.getPoint().x >= t.x && e.getPoint().x <= t.x + t.width) {
+                    sfxVolume = sliderValue(t, e.getPoint());
+                }
+            }
+        }
+        repaint();
+    }
+});
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -308,73 +335,117 @@ public class GamePanel extends JPanel implements Runnable {
     // ─────────────────────────────────────────────────────────────
     //  MUSIC
     // ─────────────────────────────────────────────────────────────
+    private volatile Clip activeMusicClip = null;
+
+
     private void playMusic(String name) {
-        if (name == null || name.isBlank()) return;
-        if (name.equals(musicTrack) && musicThread != null && musicThread.isAlive()) return;
-        stopMusic();
-        musicTrack = name;
-        if (isMuted) return;
-        stopMusicRequested = false; // safe now — old thread is confirmed dead after stopMusic()
-        musicThread = new Thread(() -> {
-            while (!stopMusicRequested) {
-                try (InputStream raw = openMusicStream(name)) {
-                    if (raw == null) return;
-                    javazoom.jl.player.Player player = new javazoom.jl.player.Player(new BufferedInputStream(raw));
-                    activeMusicPlayer = player;
-                    player.play();
-                } catch (Exception ignored) {
-                    return;
-                } finally {
-                    activeMusicPlayer = null;
+    if (name == null || name.isBlank()) return;
+    if (name.equals(musicTrack) && musicThread != null && musicThread.isAlive()) return;
+    stopMusic();
+    musicTrack = name;
+    if (isMuted) return;
+    stopMusicRequested = false;
+    musicThread = new Thread(() -> {
+        while (!stopMusicRequested) {
+            try {
+                InputStream raw = openMusicStream(name);
+                if (raw == null) return;
+                AudioInputStream ais = AudioSystem.getAudioInputStream(new BufferedInputStream(raw));
+                Clip clip = AudioSystem.getClip();
+                clip.open(ais);
+                if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                    FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+                    float dB = (float)(Math.log10(Math.max(0.0001, musicVolume)) * 20.0);
+                    gain.setValue(Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), dB)));
                 }
+                activeMusicClip = clip;
+                clip.start();
+                // Wait until clip finishes or stop is requested
+                while (!stopMusicRequested) {
+                    Thread.sleep(100);
+                    if (!clip.isRunning() && !clip.isActive()) break;
+                }
+                clip.stop();
+                clip.close();
+                activeMusicClip = null;
+            } catch (Exception e) {
+                activeMusicClip = null;
+                return;
             }
-        }, "music-" + name);
-        musicThread.setDaemon(true);
-        musicThread.start();
-    }
+        }
+    }, "music-" + name);
+    musicThread.setDaemon(true);
+    musicThread.start();
+}
 
     private void stopMusic() {
-        stopMusicRequested = true;
-        javazoom.jl.player.Player player = activeMusicPlayer;
-        if (player != null) {
-            try { player.close(); } catch (Exception ignored) {}
-        }
-        Thread t = musicThread;
-        if (t != null && t.isAlive()) {
-            try { t.join(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
-            if (t.isAlive()) t.interrupt();
-        }
-        musicThread = null;
-        activeMusicPlayer = null;
-        // Only reset stopMusicRequested AFTER the old thread is confirmed dead
-        // so the new playMusic loop doesn't race with the old thread's while-check
+    stopMusicRequested = true;
+    Clip clip = activeMusicClip;
+    if (clip != null) {
+        try { clip.stop(); clip.close(); } catch (Exception ignored) {}
     }
+    Thread t = musicThread;
+    if (t != null && t.isAlive()) {
+        try { t.join(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        if (t.isAlive()) t.interrupt();
+    }
+    musicThread = null;
+    activeMusicClip = null;
+}
 
     private void applyVolume() {
-        if (isMuted) {
-            stopMusic();
-        } else if (!musicTrack.isBlank()) {
-            String track = musicTrack;
-            musicTrack = "";
-            playMusic(track);
-        }
+    if (isMuted) {
+        stopMusic();
+    } else {
+        // Restart music from scratch when unmuting
+        String track = musicTrack;
+        musicTrack = ""; // force playMusic to not skip due to same track check
+        playMusic(track);
     }
+}
 
     public void toggleMute() { isMuted = !isMuted; applyVolume(); }
 
+    private void playSFX(String name) {
+    if (isMuted || sfxVolume <= 0f) return;
+    Thread t = new Thread(() -> {
+        try {
+            InputStream raw = getClass().getResourceAsStream("/res/soundtrack/" + name + ".wav");
+            if (raw == null) return;
+            AudioInputStream ais = AudioSystem.getAudioInputStream(new BufferedInputStream(raw));
+            Clip clip = AudioSystem.getClip();
+            clip.open(ais);
+            if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+                float dB = (float)(Math.log10(Math.max(0.0001, sfxVolume)) * 20.0);
+                gain.setValue(Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), dB)));
+            }
+            clip.start();
+            // Wait for clip to finish instead of drain()
+            while (!clip.isRunning()) Thread.sleep(10);
+            while (clip.isRunning()) Thread.sleep(10);
+            clip.close();
+        } catch (Exception ignored) {}
+    }, "sfx-" + name);
+    t.setDaemon(true);
+    t.start();
+}
+
+
+
     private InputStream openMusicStream(String name) {
-        String[] paths = {
-                "/res/soundtrack/" + name + ".mp3",
-                "/res/soundTrack/" + name + ".mp3",
-                "/res/soundtrack/" + name + ".wav",
-                "/res/soundTrack/" + name + ".wav"
-        };
-        for (String path : paths) {
-            InputStream stream = getClass().getResourceAsStream(path);
-            if (stream != null) return stream;
-        }
-        return null;
+    String[] paths = {
+        "/res/soundtrack/" + name + ".wav",
+        "/res/soundTrack/" + name + ".wav",
+        "/res/soundtrack/" + name + ".mp3",
+        "/res/soundTrack/" + name + ".mp3"
+    };
+    for (String path : paths) {
+        InputStream stream = getClass().getResourceAsStream(path);
+        if (stream != null) return stream;
     }
+    return null;
+}
 
     // ─────────────────────────────────────────────────────────────
     //  SAVE / LOAD
@@ -421,43 +492,41 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void refreshHover() {
+    String prevHovered = hoveredBtn;
     hoveredBtn = null;
     hoveredCharColor = 0;
     if (settingsOpen && settingsMuteRect().contains(mouse)) {
         hoveredBtn = isMuted ? "wmuted" : "wmute";
-        return;
-    }
-    if ((gameState == menuState || gameState == menuCharState) && fixedMenuSettingsRect().contains(mouse)) {
+    } else if ((gameState == menuState || gameState == menuCharState) && fixedMenuSettingsRect().contains(mouse)) {
         hoveredBtn = "settings";
-        return;
-    }
-    if (gameState == menuCharState) {
-        // FIX: only check actual button rectangles, ignore everything else
-        for (String name : List.of("ivan", "sam", "nimuel", "johnfiel")) {
-            Rectangle r = charButtonRect(name);
-            if (r != null && r.contains(mouse)) {
-                hoveredBtn = name;
-                hoveredCharColor = charColor(name);
-                return;
-            }
+    } else if (gameState == menuCharState) {
+        String charHover = charButtonAt(mouse);
+        if (charHover != null) {
+            hoveredBtn = charHover;
+            hoveredCharColor = charColor(charHover);
         }
-        // Mouse is not over any character button — show nothing
-        return;
-    }
-    if (gameState == playState || gameState == inventoryState || gameState == abilityState) {
+    } else if (gameState == playState || gameState == inventoryState || gameState == abilityState) {
         hoveredBtn = worldButtonAt(mouse);
-        return;
+    } else {
+        int c = switch (gameState) {
+            case menuState      -> colorAt(menuMainHitbox,  mouse);
+            case menuStartState -> colorAt(menuStartHitbox, mouse);
+            case menuCharState  -> colorAt(menuCharHitbox,  mouse);
+            case battleState    -> colorAt(battleHitbox,    mouse);
+            case outcomeState   -> colorAt(outcomeHitbox,   mouse);
+            default -> 0;
+        };
+        if (gameState == menuCharState && c == BC_HOVCHAR) {
+            hoveredCharColor = nearestCharColor(mouse);
+        }
+        hoveredBtn = c2k(c);
     }
-    int c = switch (gameState) {
-        case menuState      -> colorAt(menuMainHitbox,  mouse);
-        case menuStartState -> colorAt(menuStartHitbox, mouse);
-        case battleState    -> colorAt(battleHitbox,    mouse);
-        case outcomeState   -> colorAt(outcomeHitbox,   mouse);
-        default -> 0;
-    };
-    hoveredBtn = c2k(c);
-}
 
+    // Play hover SFX only when moving onto a NEW button
+    if (hoveredBtn != null && !hoveredBtn.equals(prevHovered)) {
+        playSFX("hover");
+    }
+}
     /** Scan nearby hitbox pixels to find which character slot is actually nearest */
     private int nearestCharColor(Point p) {
         if (menuCharHitbox == null) return 0;
@@ -521,6 +590,7 @@ public class GamePanel extends JPanel implements Runnable {
     //  MOUSE CLICK
     // ─────────────────────────────────────────────────────────────
     private void onClick(Point p) {
+        playSFX("click");
         if (settingsOpen) {
             settingsClick(p);
             return;
@@ -541,6 +611,7 @@ public class GamePanel extends JPanel implements Runnable {
             case battleState -> { battleClick(colorAt(battleHitbox, p), p); }
             case outcomeState -> { if (colorAt(outcomeHitbox, p) == BC_CONTBAT) nextRound(); }
             case creditsState -> { if (keyH.escPressed) gameState = menuState; }
+            case resultState -> resultClick(p);
         }
     }
 
@@ -624,14 +695,49 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void settingsClick(Point p) {
-        Rectangle panelR = settingsPanelRect();
-        if (settingsMuteRect().contains(p)) {
-            toggleMute();
-        } else if (!panelR.contains(p)) {
-            settingsOpen = false;
-        }
+    Rectangle panelR = settingsPanelRect();
+    if (settingsMuteRect().contains(p)) {
+        toggleMute();
+    } else if (musicSliderTrack().contains(p)) {
+        musicVolume = sliderValue(musicSliderTrack(), p);
+        applyMusicVolume();
+    } else if (sfxSliderTrack().contains(p)) {
+        sfxVolume = sliderValue(sfxSliderTrack(), p);
+    } else if (!panelR.contains(p)) {
+        settingsOpen = false;
     }
+}
 
+private float sliderValue(Rectangle track, Point p) {
+    float v = (float)(p.x - track.x) / track.width;
+    return Math.max(0f, Math.min(1f, v));
+}
+
+private Rectangle musicSliderTrack() {
+    Rectangle panel = settingsPanelRect();
+    return new Rectangle(panel.x + 30, panel.y + 134, panel.width - 60, 16);
+}
+
+private Rectangle sfxSliderTrack() {
+    Rectangle panel = settingsPanelRect();
+    return new Rectangle(panel.x + 30, panel.y + 204, panel.width - 60, 16);
+}
+
+    private void resultClick(Point p) {
+    if (battleResolved) {
+        if (player.currentHP <= 0) {
+            player.respawnWithPenalty();
+        }
+        if (pendingBattleEnemyColor == COLOR_VAUGHN && player.currentHP > 0) {
+            startNarration(); return;
+        }
+        gameState = playState;
+        currentDialog = ""; dialogStage = 0; lastNPCColor = 0;
+        battleResolved = false; waitingOutcome = false;
+        playMusic(GLE_MAP.equals(currentMapName) ? "gle_soundtrack" : "frontgate_soundtrack");
+        autoSave();
+    }
+}
     private void handleItemClick(Point p) {
         int pw=520, px=getWidth()/2-260, py=getHeight()/2-210;
         List<ItemSystem.Item> list = items.getItems();
@@ -884,55 +990,75 @@ public class GamePanel extends JPanel implements Runnable {
         String pp = pm.name().toLowerCase(), ep = em.name().toLowerCase();
         outcomeRPSImg = img("/res/gui/pixelart/battle_outcome/" + pp + "_" + ep + ".png");
         waitingOutcome = true;
+        playSFX("Move_Sound");
         gameState = outcomeState;
     }
 
     private void grantRewards() {
-        int ic = rand.nextInt(5) + 1;
-        for (int i=0;i<ic;i++) items.addRandom(rand);
-        int ac = rand.nextDouble() < 0.3 ? rand.nextInt(3)+1 : 1;
-        for (int i=0;i<ac;i++) abilities.addRandom(rand);
-        autoSave();
-    }
+    lastRewardItems.clear();
+    lastRewardAbils.clear();
 
-    private void nextRound() {
-        gameState = battleState;
-        if (battleResolved) {
-            if (player.currentHP <= 0) {
-                if (isFinalBoss) {
-                    // Lost to the final boss — show lose screen, then start over
-                    stopMusic();
-                    enemyStats = new EnemyStats();
-                    items      = new ItemSystem();
-                    abilities  = new AbilitySystem();
-                    saveData   = null;
-                    new java.io.File(System.getProperty("user.home") + java.io.File.separator + "fivesix_save.dat").delete();
-                    gameState = loseState;
-                    return;
-                }
-                player.respawnWithPenalty();
-            }
-            if (isFinalBoss && player.currentHP > 0) {
-                // Win — wipe save immediately so there's nothing to continue
-                new java.io.File(System.getProperty("user.home") + java.io.File.separator + "fivesix_save.dat").delete();
-                saveData = null;
-                gameState = winState;
-                return;
-            }
-            if (pendingBattleEnemyColor == COLOR_VAUGHN && player.currentHP > 0) {
-                startNarration(); return;
-            }
-            gameState = playState;
-            currentDialog = ""; dialogStage = 0; lastNPCColor = 0;
-            battleResolved = false; waitingOutcome = false;
-            playMusic(GLE_MAP.equals(currentMapName) ? "gle_soundtrack" : "frontgate_soundtrack");
-            autoSave();
-        } else {
-            battleRound++;
-            battleMsg = "Round " + battleRound + " - Choose your move!";
-            waitingOutcome = false;
+    if (!isFinalBoss) {
+        int ic = rand.nextInt(5) + 1;
+        for (int i = 0; i < ic; i++) {
+            ItemSystem.Item it = items.addRandom(rand);
+            if (it != null) lastRewardItems.add(it.displayName);
+        }
+        int ac = rand.nextDouble() < 0.3 ? rand.nextInt(3) + 1 : 1;
+        for (int i = 0; i < ac; i++) {
+            AbilitySystem.Ability ab = abilities.addRandom(rand);
+            if (ab != null) lastRewardAbils.add(ab.displayName);
         }
     }
+
+    showRewardsBox = !isFinalBoss;
+    autoSave();
+}
+
+    private void nextRound() {
+    showRewardsBox = false;
+    if (battleResolved) {
+        boolean playerWon = player != null && player.currentHP > 0;
+
+        // Final boss win
+        if (isFinalBoss && playerWon) {
+            stopMusic();
+            playSFX("Win_Final_Boss");
+            new java.io.File(System.getProperty("user.home") + java.io.File.separator + "fivesix_save.dat").delete();
+            saveData = null;
+            gameState = winState;
+            return;
+        }
+        // Final boss loss
+        if (isFinalBoss && !playerWon) {
+            stopMusic();
+            playSFX("Loss_Final_Boss");
+            enemyStats = new EnemyStats();
+            items      = new ItemSystem();
+            abilities  = new AbilitySystem();
+            saveData   = null;
+            new java.io.File(System.getProperty("user.home") + java.io.File.separator + "fivesix_save.dat").delete();
+            gameState = loseState;
+            return;
+        }
+        // Normal win
+        if (playerWon) {
+            stopMusic();
+            playSFX("Win_Normal");
+        }
+        // Normal loss
+        if (!playerWon) {
+            stopMusic();
+            playSFX("Loss_Normal");
+        }
+        gameState = resultState;
+        return;
+    }
+    gameState = battleState;
+    battleRound++;
+    battleMsg = "Round " + battleRound + " - Choose your move!";
+    waitingOutcome = false;
+}
 
     // ─────────────────────────────────────────────────────────────
     //  NARRATION (post-Vaughn → final boss)
@@ -959,6 +1085,7 @@ public class GamePanel extends JPanel implements Runnable {
         currentDialog = narLines[0];
         gameState = narrationState;
     }
+
 
     // ─────────────────────────────────────────────────────────────
     //  ITEMS / ABILITIES
@@ -1061,6 +1188,7 @@ public class GamePanel extends JPanel implements Runnable {
                     }
                     case inventoryState -> gameState = (prevStateBeforePanel == battleState ? battleState : playState);
                     case abilityState -> gameState = (prevStateBeforePanel == battleState ? battleState : playState);
+                    case resultState -> { }
                     default -> { }
                 }
             }
@@ -1130,6 +1258,7 @@ public class GamePanel extends JPanel implements Runnable {
             case loseState      -> paintLose(g2);
             case preBattleState -> paintPreBattle(g2);
             case narrationState -> paintNarration(g2);
+            case resultState -> paintResult(g2);
         }
         g2.dispose();
     }
@@ -1348,25 +1477,84 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void paintSettingsPanel(Graphics2D g2) {
-        Rectangle panel = settingsPanelRect();
-        int px = panel.x, py = panel.y, pw = panel.width, ph = panel.height;
-        g2.setColor(new Color(20,20,40,240)); g2.fillRoundRect(px,py,pw,ph,20,20);
-        g2.setColor(new Color(100,150,255)); g2.setStroke(new BasicStroke(2)); g2.drawRoundRect(px,py,pw,ph,20,20);
-        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.BOLD,28));
-        g2.drawString("SETTINGS",px+140,py+50);
-        String mk = isMuted ? "wmuted" : "wmute";
-        BufferedImage[] ma = btnImgs.get(mk);
-        boolean hoverMute = settingsMuteRect().contains(mouse);
-        BufferedImage muteImg = (ma != null) ? ((hoverMute && ma[1] != null) ? ma[1] : ma[0]) : null;
-        if (muteImg != null) {
-            Rectangle muteRect = settingsMuteRect();
-            g2.drawImage(muteImg, muteRect.x, muteRect.y, muteRect.width, muteRect.height, null);
-        }
-        g2.setColor(Color.WHITE); g2.setFont(new Font("Arial",Font.PLAIN,22));
-        g2.drawString(isMuted?"Unmute":"Mute",px+200,py+120);
-        g2.setFont(new Font("Arial",Font.ITALIC,16)); g2.setColor(new Color(180,180,180));
-        g2.drawString("Click outside the panel to dismiss",px+55,py+ph-18);
+    Rectangle panel = settingsPanelRect();
+    int px = panel.x, py = panel.y, pw = panel.width, ph = panel.height;
+
+    g2.setColor(new Color(20, 20, 40, 245));
+    g2.fillRoundRect(px, py, pw, ph, 20, 20);
+    g2.setColor(new Color(100, 150, 255));
+    g2.setStroke(new BasicStroke(2));
+    g2.drawRoundRect(px, py, pw, ph, 20, 20);
+
+    // Title
+    g2.setColor(Color.WHITE);
+    g2.setFont(new Font("Arial", Font.BOLD, 26));
+    String title = "SETTINGS";
+    g2.drawString(title, px + pw/2 - g2.getFontMetrics().stringWidth(title)/2, py + 40);
+
+    // Divider
+    g2.setColor(new Color(100, 150, 255, 100));
+    g2.setStroke(new BasicStroke(1f));
+    g2.drawLine(px + 20, py + 50, px + pw - 20, py + 50);
+
+    // Mute button
+    String mk = isMuted ? "wmuted" : "wmute";
+    BufferedImage[] ma = btnImgs.get(mk);
+    boolean hoverMute = settingsMuteRect().contains(mouse);
+    BufferedImage muteImg = (ma != null) ? ((hoverMute && ma[1] != null) ? ma[1] : ma[0]) : null;
+    if (muteImg != null) {
+        Rectangle muteRect = settingsMuteRect();
+        g2.drawImage(muteImg, muteRect.x, muteRect.y, muteRect.width, muteRect.height, null);
     }
+    g2.setColor(Color.WHITE);
+    g2.setFont(new Font("Arial", Font.PLAIN, 18));
+    g2.drawString(isMuted ? "Unmute" : "Mute", px + 190, py + 88);
+
+    // Music volume slider
+    drawSlider(g2, px + 30, py + 120, pw - 60, "Music Volume", musicVolume);
+
+    // SFX volume slider
+    drawSlider(g2, px + 30, py + 190, pw - 60, "SFX Volume", sfxVolume);
+
+    // Dismiss hint
+    g2.setFont(new Font("Arial", Font.ITALIC, 13));
+    g2.setColor(new Color(150, 150, 150));
+    String hint = "Click outside to close  |  Drag sliders to adjust";
+    g2.drawString(hint, px + pw/2 - g2.getFontMetrics().stringWidth(hint)/2, py + ph - 12);
+}
+
+private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float value) {
+    // Label
+    g2.setFont(new Font("Arial", Font.BOLD, 16));
+    g2.setColor(new Color(200, 200, 255));
+    g2.drawString(label, x, y);
+
+    int sy = y + 14;
+    int sh = 8;
+
+    // Track background
+    g2.setColor(new Color(60, 60, 90));
+    g2.fillRoundRect(x, sy, w, sh, sh, sh);
+
+    // Filled portion
+    int filled = (int)(w * value);
+    g2.setColor(new Color(100, 150, 255));
+    g2.fillRoundRect(x, sy, filled, sh, sh, sh);
+
+    // Thumb
+    int thumbX = x + filled - 8;
+    int thumbY = sy - 6;
+    g2.setColor(new Color(180, 210, 255));
+    g2.fillOval(thumbX, thumbY, 20, 20);
+    g2.setColor(new Color(100, 150, 255));
+    g2.setStroke(new BasicStroke(2f));
+    g2.drawOval(thumbX, thumbY, 20, 20);
+
+    // Percentage
+    g2.setFont(new Font("Arial", Font.PLAIN, 14));
+    g2.setColor(new Color(180, 180, 180));
+    g2.drawString((int)(value * 100) + "%", x + w + 8, sy + sh);
+}
 
     private void drawMenuSettingsButton(Graphics2D g2) {
         BufferedImage[] imgs = btnImgs.get("settings");
@@ -1385,13 +1573,13 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Rectangle settingsPanelRect() {
-        return new Rectangle(getWidth()/2-200, getHeight()/2-125, 400, 250);
-    }
+    return new Rectangle(getWidth()/2 - 220, getHeight()/2 - 160, 440, 320);
+}
 
     private Rectangle settingsMuteRect() {
-        Rectangle panel = settingsPanelRect();
-        return new Rectangle(panel.x + 60, panel.y + 80, 120, 60);
-    }
+    Rectangle panel = settingsPanelRect();
+    return new Rectangle(panel.x + 50, panel.y + 62, 120, 44);
+}
 
     // ─────────────────────────────────────────────────────────────
     //  PLAY STATE
@@ -1598,21 +1786,32 @@ public class GamePanel extends JPanel implements Runnable {
     //  Layer: outcome_scene > RPS image (BC_OUTCZONE region) > continue btn
     // ─────────────────────────────────────────────────────────────
     private void paintOutcome(Graphics2D g2) {
-        fill(g2, outcomeSceneImg);
-        if (outcomeRPSImg != null && outcomeHitbox != null) {
-            Rectangle r = bounds(outcomeHitbox, BC_OUTCZONE);
-            if (r!=null) g2.drawImage(outcomeRPSImg, r.x, r.y, r.width, r.height, null);
-        }
-        drawBtn(g2, outcomeHitbox, BC_CONTBAT, "contbat");
-        Rectangle continueRect = bounds(outcomeHitbox, BC_CONTBAT);
-        g2.setFont(new Font("Arial",Font.BOLD,28));
-        int my = continueRect != null ? continueRect.y + continueRect.height + 48 : getHeight()-120;
-        for (String ln : wrap(g2, battleMsg, getWidth()-200)) {
-            int lw=g2.getFontMetrics().stringWidth(ln);
-            g2.setColor(new Color(255,230,100)); g2.drawString(ln,getWidth()/2-lw/2,my); my+=36;
-        }
+    fill(g2, outcomeSceneImg);
+
+    if (outcomeRPSImg != null && outcomeHitbox != null) {
+        Rectangle r = bounds(outcomeHitbox, BC_OUTCZONE);
+        if (r != null) g2.drawImage(outcomeRPSImg, r.x, r.y, r.width, r.height, null);
     }
 
+    // Only show Continue button if the round isn't over yet
+    if (!battleResolved) {
+        drawBtn(g2, outcomeHitbox, BC_CONTBAT, "contbat");
+    } else {
+        // Final blow — replace continue button with a "See Results" prompt
+        drawBtn(g2, outcomeHitbox, BC_CONTBAT, "contbat");
+    }
+
+    g2.setFont(new Font("Arial", Font.BOLD, 26));
+    int msgY = (outcomeHitbox != null && bounds(outcomeHitbox, BC_OUTCZONE) != null)
+        ? bounds(outcomeHitbox, BC_OUTCZONE).y - 40 : 60;
+
+    for (String ln : wrap(g2, battleMsg, getWidth() - 200)) {
+        int lw = g2.getFontMetrics().stringWidth(ln);
+        g2.setColor(new Color(255, 230, 100));
+        g2.drawString(ln, getWidth() / 2 - lw / 2, msgY);
+        msgY += 34;
+    }
+}
     // ─────────────────────────────────────────────────────────────
     //  INVENTORY / ABILITY
     // ─────────────────────────────────────────────────────────────
@@ -1876,4 +2075,179 @@ public class GamePanel extends JPanel implements Runnable {
             && enemyStats.isDefeated(COLOR_YOHANN)  && enemyStats.isDefeated(COLOR_DIRK)
             && enemyStats.isDefeated(COLOR_JAKE);
     }
+
+    private void paintResult(Graphics2D g2) {
+    // Background: the map they were just on
+    if (mapImage != null) {
+        fill(g2, mapImage);
+    } else {
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, getWidth(), getHeight());
+    }
+
+    if (battleResolved && player != null && player.currentHP > 0) {
+        // ── WIN REWARDS BOX ────────────────────────────────────────
+        // ── WIN REWARDS BOX ────────────────────────────────────────
+g2.setColor(new Color(0, 0, 0, 160));
+g2.fillRect(0, 0, getWidth(), getHeight());
+
+int rowCount = Math.max(1, lastRewardItems.size()) + lastRewardAbils.size();
+int bw = 440, bh = 80 + 30 + rowCount * 30 + 70;
+int bx = getWidth() / 2 - bw / 2;
+int by = getHeight() / 2 - bh / 2;
+
+// Panel background
+g2.setColor(new Color(15, 20, 15, 250));
+g2.fillRoundRect(bx, by, bw, bh, 20, 20);
+g2.setColor(new Color(255, 215, 0));
+g2.setStroke(new BasicStroke(3f));
+g2.drawRoundRect(bx, by, bw, bh, 20, 20);
+
+// "YOU WIN!" header — clean gold, no glow blob
+g2.setFont(new Font("Arial", Font.BOLD, 46));
+FontMetrics fmw = g2.getFontMetrics();
+String win = "YOU WIN!";
+// Thin black shadow only
+g2.setColor(new Color(0, 0, 0, 180));
+g2.drawString(win, bx + bw/2 - fmw.stringWidth(win)/2 + 3, by + 56 + 3);
+// Gold text
+g2.setColor(new Color(255, 215, 0));
+g2.drawString(win, bx + bw/2 - fmw.stringWidth(win)/2, by + 56);
+
+// Divider
+g2.setColor(new Color(255, 215, 0, 120));
+g2.setStroke(new BasicStroke(1f));
+g2.drawLine(bx + 20, by + 68, bx + bw - 20, by + 68);
+
+// "Rewards earned:" label
+g2.setFont(new Font("Arial", Font.BOLD, 15));
+g2.setColor(new Color(200, 200, 200));
+g2.drawString("Rewards earned:", bx + 26, by + 90);
+
+int ry = by + 116;
+g2.setFont(new Font("Arial", Font.PLAIN, 16));
+
+// Deduplicate items with counts
+java.util.LinkedHashMap<String, Integer> itemCounts = new java.util.LinkedHashMap<>();
+for (String name : lastRewardItems) itemCounts.merge(name, 1, Integer::sum);
+
+if (itemCounts.isEmpty()) {
+    g2.setColor(new Color(150, 150, 150));
+    g2.drawString("  No items", bx + 26, ry);
+    ry += 30;
+} else {
+    for (java.util.Map.Entry<String, Integer> entry : itemCounts.entrySet()) {
+        g2.setColor(new Color(255, 210, 60));
+        String label = entry.getValue() > 1
+            ? "  x" + entry.getValue() + "  " + entry.getKey()
+            : "  + " + entry.getKey();
+        g2.drawString(label, bx + 26, ry);
+        ry += 30;
+    }
+}
+
+// Abilities
+for (String name : lastRewardAbils) {
+    g2.setColor(new Color(160, 200, 255));
+    g2.drawString("  + " + name + "  (ability)", bx + 26, ry);
+    ry += 30;
+}
+
+// Divider before footer
+g2.setColor(new Color(80, 80, 80, 160));
+g2.setStroke(new BasicStroke(1f));
+g2.drawLine(bx + 20, by + bh - 46, bx + bw - 20, by + bh - 46);
+
+// Footer
+g2.setFont(new Font("Arial", Font.ITALIC, 13));
+g2.setColor(new Color(130, 130, 130));
+g2.drawString("Added to your inventory", bx + 26, by + bh - 26);
+
+// Click to continue prompt — below the box
+g2.setFont(new Font("Arial", Font.ITALIC, 17));
+g2.setColor(new Color(200, 200, 200));
+String prompt = "Click anywhere to continue";
+g2.drawString(prompt, getWidth()/2 - g2.getFontMetrics().stringWidth(prompt)/2, by + bh + 34);
+    } else if (battleResolved && player != null && player.currentHP <= 0) {
+        // ── DEFEAT OVERLAY ─────────────────────────────────────────
+        g2.setColor(new Color(100, 0, 0, 180));
+        g2.fillRect(0, 0, getWidth(), getHeight());
+
+        Font defeatFont = new Font("Arial", Font.BOLD, 100);
+        g2.setFont(defeatFont);
+        String defeatText = "DEFEAT";
+        FontMetrics fmd = g2.getFontMetrics();
+        int dx = getWidth() / 2 - fmd.stringWidth(defeatText) / 2;
+        int dy = getHeight() / 2 + 30;
+
+        // Red glow layers
+        for (int spread = 14; spread >= 1; spread--) {
+            float alpha = 0.05f * (15 - spread);
+            g2.setColor(new Color(1f, 0f, 0f, Math.min(1f, alpha)));
+            for (int oy = -spread; oy <= spread; oy += spread)
+                for (int ox = -spread; ox <= spread; ox += spread)
+                    if (ox != 0 || oy != 0)
+                        g2.drawString(defeatText, dx + ox, dy + oy);
+        }
+
+        // Black outline
+        g2.setColor(Color.BLACK);
+        for (int oy = -4; oy <= 4; oy++)
+            for (int ox = -4; ox <= 4; ox++)
+                if (ox != 0 || oy != 0)
+                    g2.drawString(defeatText, dx + ox, dy + oy);
+
+        // Main red text
+        g2.setColor(new Color(225, 30, 30));
+        g2.drawString(defeatText, dx, dy);
+
+        // Sub-message
+        g2.setFont(new Font("Arial", Font.BOLD, 22));
+        g2.setColor(new Color(220, 150, 150));
+        String sub = "You were defeated by " + enemyName + "...";
+        int sw = g2.getFontMetrics().stringWidth(sub);
+        g2.drawString(sub, getWidth() / 2 - sw / 2, dy + 58);
+
+        // Click to continue
+        g2.setFont(new Font("Arial", Font.ITALIC, 17));
+        g2.setColor(new Color(180, 180, 180));
+        String prompt = "Click anywhere to continue";
+        g2.drawString(prompt, getWidth()/2 - g2.getFontMetrics().stringWidth(prompt)/2, dy + 108);
+    }
+}
+
+private void applyMusicVolume() {
+    if (isMuted) return;
+    Clip clip = activeMusicClip;
+    if (clip != null && clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+        FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+        float dB = (float)(Math.log10(Math.max(0.0001, musicVolume)) * 20.0);
+        gain.setValue(Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), dB)));
+    }
+}
+
+private void debugAudio() {
+    // Test music stream
+    InputStream ms = openMusicStream("menu_sountrack");
+    System.out.println("Music stream: " + (ms != null ? "FOUND" : "NOT FOUND"));
+
+    // Test SFX stream
+    InputStream ss = getClass().getResourceAsStream("/res/soundtrack/click.wav");
+    System.out.println("SFX click.wav: " + (ss != null ? "FOUND" : "NOT FOUND"));
+
+    // Test AudioSystem
+    try {
+        if (ss == null) ss = getClass().getResourceAsStream("/res/soundtrack/click.wav");
+        if (ss != null) {
+            AudioInputStream ais = AudioSystem.getAudioInputStream(new BufferedInputStream(ss));
+            Clip clip = AudioSystem.getClip();
+            clip.open(ais);
+            System.out.println("Clip opened OK, frames: " + clip.getFrameLength());
+            clip.close();
+        }
+    } catch (Exception e) {
+        System.out.println("Clip error: " + e.getMessage());
+        e.printStackTrace();
+    }
+}
 }

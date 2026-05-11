@@ -20,10 +20,12 @@ public class AbilitySystem {
 
     private final List<Ability> inventory = new ArrayList<>();
 
-    public void addRandom(Random rand) {
-        Ability[] all = Ability.values();
-        inventory.add(all[rand.nextInt(all.length)]);
-    }
+    public Ability addRandom(Random rand) {
+    Ability[] all = Ability.values();
+    Ability ab = all[rand.nextInt(all.length)];
+    inventory.add(ab);
+    return ab;
+}
 
     public void remove(Ability a)     { inventory.remove(a); }
     public boolean isEmpty()          { return inventory.isEmpty(); }
