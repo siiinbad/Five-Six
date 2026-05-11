@@ -21,15 +21,15 @@ public class ItemSystem {
     private final Map<Item, Integer> inventory = new LinkedHashMap<>();
 
     public Item addRandom(Random rand) {
-    int roll = rand.nextInt(10);
-    Item item;
-    if      (roll < 4) item = Item.WATER;
-    else if (roll < 7) item = Item.BARNUTS;
-    else if (roll < 8) item = Item.GREENCROSS;
-    else if (roll < 9) item = Item.COFFEE;
-    else               item = rand.nextBoolean() ? Item.ENERGY_DRINK : Item.SLEEPING_MASK;
-    inventory.merge(item, 1, Integer::sum);
-    return item;
+        int roll = rand.nextInt(10);
+        Item item;
+        if      (roll < 4) item = Item.WATER;
+        else if (roll < 7) item = Item.BARNUTS;
+        else if (roll < 8) item = Item.GREENCROSS;
+        else if (roll < 9) item = Item.COFFEE;
+        else               item = rand.nextBoolean() ? Item.ENERGY_DRINK : Item.SLEEPING_MASK;
+        inventory.merge(item, 1, Integer::sum);
+        return item;
     }
 
     /** Remove one of the given item */

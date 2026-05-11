@@ -89,26 +89,26 @@ public final class DialogueDisplay {
 
     public static String[] finalBossPreBattle(String playerName) {
         return new String[] {
-            playerName + ": \"Back off! I'm not giving you anything!\"",
-            "Beggar: \"You think you can just walk away? Hand it over - NOW!\"",
-            playerName + ": \"You want it? Come and get it then.\"",
-            "Beggar: \"Fine. Don't say I didn't warn you...\"",
-            "- Both of you get into stance. There's no turning back. -"
+                playerName + ": \"Back off! I'm not giving you anything!\"",
+                "Beggar: \"You think you can just walk away? Hand it over - NOW!\"",
+                playerName + ": \"You want it? Come and get it then.\"",
+                "Beggar: \"Fine. Don't say I didn't warn you...\"",
+                "- Both of you get into stance. There's no turning back. -"
         };
     }
 
     public static String[] finalBossNarration() {
         return new String[] {
-            "After a long day of fighting, you've finally reclaimed every last peso...",
-            "Player: \"Finally... I have all my money back. Jollibee, here I come-\"",
-            "???:     \"Excuse me po, sir...\"",
-            "Player: \"Huh?\"",
-            "Beggar:  \"Sir, pwede po bang makahingi ng barya? Gutom na gutom na po ako.\"",
-            "Player: \"Sorry, I can't. I only have just enough for what I need.\"",
-            "Beggar:  \"...Just enough? No, no. I saw how much you have. Don't lie to me.\"",
-            "Player: \"I'm serious, I don't have anything extra-\"",
-            "Beggar:  \"THEN I'LL TAKE IT FROM YOU!!\"",
-            "The beggar lunges forward. You have no choice but to fight!"
+                "After a long day of fighting, you've finally reclaimed every last peso...",
+                "Player: \"Finally... I have all my money back. Jollibee, here I come-\"",
+                "???:     \"Excuse me po, sir...\"",
+                "Player: \"Huh?\"",
+                "Beggar:  \"Sir, pwede po bang makahingi ng barya? Gutom na gutom na po ako.\"",
+                "Player: \"Sorry, I can't. I only have just enough for what I need.\"",
+                "Beggar:  \"...Just enough? No, no. I saw how much you have. Don't lie to me.\"",
+                "Player: \"I'm serious, I don't have anything extra-\"",
+                "Beggar:  \"THEN I'LL TAKE IT FROM YOU!!\"",
+                "The beggar lunges forward. You have no choice but to fight!"
         };
     }
 }
