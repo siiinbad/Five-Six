@@ -5,12 +5,9 @@ import java.awt.event.KeyListener;
 
 public class KeyHandler implements KeyListener {
 
-    GamePanel gp;
     public boolean upPressed, downPressed, leftPressed, rightPressed, enterPressed, ePressed, escPressed, f1Pressed;
 
-    public KeyHandler(GamePanel gp) {
-        this.gp = gp;
-    }
+    public KeyHandler() {}
 
     @Override
     public void keyTyped(KeyEvent e) {}

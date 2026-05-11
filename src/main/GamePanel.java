@@ -1,8 +1,5 @@
 package main;
 
-import static main.HitboxColors.Map.*;
-import static main.HitboxColors.Ui.*;
-
 import entity.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -12,10 +9,11 @@ import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.util.*;
 import java.util.List;
-import javax.imageio.ImageIO;
+import javax.sound.sampled.*;
 import javax.swing.JPanel;
 import javax.swing.ToolTipManager;
-import javax.sound.sampled.*;
+import static main.HitboxColors.Map.*;
+import static main.HitboxColors.Ui.*;
 
 public class GamePanel extends JPanel implements Runnable {
 
@@ -27,9 +25,10 @@ public class GamePanel extends JPanel implements Runnable {
     public int screenHeight = tileSize * 12;
 
     // SYSTEM
-    public KeyHandler keyH = new KeyHandler(this);
+    public KeyHandler keyH = new KeyHandler();
     Thread gameThread;
     public Player player;
+    private final ImageDisplay imageDisplay = new ImageDisplay();
 
     // MAP
     public BufferedImage mapImage;
@@ -191,7 +190,8 @@ public class GamePanel extends JPanel implements Runnable {
         // Disable Swing tooltips (prevents hover text labels from popping up).
         ToolTipManager.sharedInstance().setEnabled(false);
 
-        loadAll();
+        imageDisplay.loadAll();
+        syncImageState();
         debugAudio();
         saveData = SaveData.loadFromDisk();  // restore save across sessions
         playMusic("menu_sountrack");
@@ -232,71 +232,32 @@ public class GamePanel extends JPanel implements Runnable {
     // ─────────────────────────────────────────────────────────────
     //  RESOURCE LOADING
     // ─────────────────────────────────────────────────────────────
-    private void loadAll() {
-        menuScreenImg = img("/res/gui/pixelart/menu/menu_screen.png");
-        logoImg       = img("/res/gui/pixelart/menu/fixsix_log.png");
-
-        menuMainHitbox  = img("/res/gui/button_hitbox/menu_main_hitbox.png");
-        menuStartHitbox = img("/res/gui/button_hitbox/menu_start_hitbox.png");
-        menuCharHitbox  = img("/res/gui/button_hitbox/menu_characterselect_hitbox.png");
-        battleHitbox    = img("/res/gui/button_hitbox/battle_hitbox.png");
-        battleSpriteHitbox = img("/res/gui/button_hitbox/battle_sprite_hitbox.png");
-        worldGuiHitbox  = img("/res/gui/button_hitbox/world_gui_hitbox.png");
-        outcomeHitbox   = img("/res/gui/button_hitbox/outcome_hitbox.png");
-
-        // Menu buttons
-        btn("start",    "/res/gui/buttons/menu/start_idle.png",           "/res/gui/buttons/menu/start_hover.png");
-        btn("credits",  "/res/gui/buttons/menu/credits_idle.png",         "/res/gui/buttons/menu/credits_hover.png");
-        btn("quit",     "/res/gui/buttons/menu/quit_idle.png",            "/res/gui/buttons/menu/quit_hover.png");
-        btn("settings", "/res/gui/buttons/menu/settings_idle.png",        "/res/gui/buttons/menu/settings_hover.png");
-        btn("mute",     "/res/gui/buttons/menu/mute_idle.png",            "/res/gui/buttons/menu/mute_hover.png");
-        btn("muted",    "/res/gui/buttons/menu/muted_idle.png",           "/res/gui/buttons/menu/muted_hover.png");
-        btn("save",     "/res/gui/buttons/menu/save_idle.png",            "/res/gui/buttons/menu/save_hover.png");
-        btn("continue", "/res/gui/buttons/menu/continue_idle.png",        "/res/gui/buttons/menu/continue_hover.png");
-        btn("selchar",  "/res/gui/buttons/menu/selectcharacter_idle.png", "/res/gui/buttons/menu/selectcharacter_hover.png");
-
-        // Player select
-        btn("ivan",     "/res/gui/buttons/player/ivan_idle.png",     "/res/gui/buttons/player/ivan_hover.png");
-        btn("sam",      "/res/gui/buttons/player/sam_idle.png",      "/res/gui/buttons/player/sam_hover.png");
-        btn("nimuel",   "/res/gui/buttons/player/nimuel_idle.png",   "/res/gui/buttons/player/nimuel_hover.png");
-        btn("johnfiel", "/res/gui/buttons/player/johnfiel_idle.png", "/res/gui/buttons/player/johnfiel_hover.png");
-
-        // World GUI
-        btn("item_inv",  "/res/gui/buttons/world/item_idle.png",       "/res/gui/buttons/world/item_hover.png");
-        btn("abil_inv",  "/res/gui/buttons/world/ability_idle.png",     "/res/gui/buttons/world/ability_hover.png");
-        btn("backmenu",  "/res/gui/buttons/world/backtomenu_idle.png",  "/res/gui/buttons/world/backtomenu_hover.png");
-        btn("wsave",     "/res/gui/buttons/world/save_idle.png",        "/res/gui/buttons/world/save_hover.png");
-        btn("wset",      "/res/gui/buttons/world/settings_idle.png",    "/res/gui/buttons/world/settings_hover.png");
-        btn("wmute",     "/res/gui/buttons/world/mute_idle.png",        "/res/gui/buttons/world/mute_hover.png");
-        btn("wmuted",    "/res/gui/buttons/world/muted_idle.png",       "/res/gui/buttons/world/muted_hover.png");
-
-        // Battle
-        btn("rock",     "/res/gui/buttons/battle/rock_idle.png",        "/res/gui/buttons/battle/rock_hover.png");
-        btn("paper",    "/res/gui/buttons/battle/paper_idle.png",        "/res/gui/buttons/battle/paper_hover.png");
-        btn("scissors", "/res/gui/buttons/battle/scissors_idle.png",     "/res/gui/buttons/battle/scissors_hover.png");
-        btn("contbat",  "/res/gui/buttons/battle/continue_idle.png",     "/res/gui/buttons/battle/continue_hover.png");
-        btn("useitem",  "/res/gui/buttons/battle/items_idle.png",        "/res/gui/buttons/battle/items_hover.png");
-        btn("useabil",  "/res/gui/buttons/battle/abilities_idle.png",    "/res/gui/buttons/battle/abilities_hover.png");
-
-        // Character previews
-        // Character-select preview images
-        charSelectImg.put("ivan",     img("/res/sprites/player/ivan/ivan_selectcharacter.png"));
-        charSelectImg.put("sam",      img("/res/sprites/player/sam/sam_selectcharacter.png"));
-        charSelectImg.put("nimuel",   img("/res/sprites/player/nimuel/nimuel_selectcharacter.png"));
-        charSelectImg.put("johnfiel", img("/res/sprites/player/johnfiel/johnfiel_selectcharacter.png"));
-
-        // NPC stands
-        String[] npcs = {"james","alieyandrew","kyle","johnru","adrian","darryll","gio","yohann","dirk","jake","vaughn"};
-        for (String n : npcs) npcStand.put(n, img("/res/sprites/enemies/" + n + "/" + n + "_stand.png"));
-    }
-
-    private BufferedImage img(String path) {
-        try { return ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(path))); }
-        catch (Exception e) { return null; }
-    }
-
-    private void btn(String key, String idle, String hover) {
-        btnImgs.put(key, new BufferedImage[]{ img(idle), img(hover) });
+    private void syncImageState() {
+        mapImage = imageDisplay.getMapImage();
+        hitboxImage = imageDisplay.getHitboxImage();
+        menuMainHitbox = imageDisplay.getMenuMainHitbox();
+        menuStartHitbox = imageDisplay.getMenuStartHitbox();
+        menuCharHitbox = imageDisplay.getMenuCharHitbox();
+        battleHitbox = imageDisplay.getBattleHitbox();
+        battleSpriteHitbox = imageDisplay.getBattleSpriteHitbox();
+        worldGuiHitbox = imageDisplay.getWorldGuiHitbox();
+        outcomeHitbox = imageDisplay.getOutcomeHitbox();
+        menuScreenImg = imageDisplay.getMenuScreenImg();
+        logoImg = imageDisplay.getLogoImg();
+        mapTitleImg = imageDisplay.getMapTitleImg();
+        battleSceneImg = imageDisplay.getBattleSceneImg();
+        outcomeSceneImg = imageDisplay.getOutcomeSceneImg();
+        outcomeRPSImg = imageDisplay.getOutcomeRPSImg();
+        btnImgs.clear();
+        btnImgs.putAll(imageDisplay.getButtonImages());
+        npcStand.clear();
+        npcStand.putAll(imageDisplay.getNpcStandImages());
+        charSelectImg.clear();
+        charSelectImg.putAll(imageDisplay.getCharacterSelectImages());
+        playerBattleImg = imageDisplay.getPlayerBattleImg();
+        playerDialogImg = imageDisplay.getPlayerDialogImg();
+        enemyBattleImg = imageDisplay.getEnemyBattleImg();
+        enemyDialogImg = imageDisplay.getEnemyDialogImg();
     }
 
     public void loadMapImages(String mapName) {
@@ -308,24 +269,17 @@ public class GamePanel extends JPanel implements Runnable {
         settingsOpen   = false;
         narrating      = false;
 
+        imageDisplay.loadMapImages(mapName);
+        syncImageState();
+
         switch (mapName) {
             case GLE_MAP -> {
-                mapImage    = img("/res/gui/pixelart/map/gle.png");
-                hitboxImage = img("/res/gui/pixelart/map/gle_hitbox.png");
-                mapTitleImg = img("/res/gui/pixelart/map/gle_title.png");
                 playMusic("gle_soundtrack");
             }
             case FRONTGATE_MAP -> {
-                mapImage    = img("/res/gui/pixelart/map/frontgate.png");
-                hitboxImage = img("/res/gui/pixelart/map/frontgate_hitbox.png");
-                mapTitleImg = img("/res/gui/pixelart/map/frontgate_title.png");
                 playMusic("frontgate_soundtrack");
             }
-            case EMALL_MAP -> {
-                mapImage    = null;
-                hitboxImage = null;
-                mapTitleImg = null;
-            }
+            case EMALL_MAP -> { }
         }
         if (player != null) setPlayerSpawn();
         autoSave();
@@ -872,37 +826,15 @@ private Rectangle sfxSliderTrack() {
         isFinalBoss    = (pendingBattleEnemyColor == COLOR_FINALBOSS);
         enemyName      = enemyName(pendingBattleEnemyColor);
 
-        String mapKey = switch (currentMapName) {
-            case GLE_MAP -> "gle"; case FRONTGATE_MAP -> "frontgate"; default -> "emall";
-        };
-        battleSceneImg  = img("/res/gui/pixelart/battle_scene/" + mapKey + "_battle.png");
-        outcomeSceneImg = img("/res/gui/pixelart/battle_scene/" + mapKey + "_outcome.png");
-
-        String folder = enemyFolder(pendingBattleEnemyColor);
-        if (folder != null) {
-            enemyBattleImg = img("/res/sprites/enemies/" + folder + "/" + folder + "_battle.png");
-            enemyDialogImg = img("/res/sprites/enemies/" + folder + "/" + folder + "_dialog.png");
-        } else if (isFinalBoss) {
-            enemyBattleImg = img("/res/sprites/enemies/finalboss/final_boss.png");
-            enemyDialogImg = enemyBattleImg;
-        }
-        if (player != null) {
-            String pn = player.characterName;
-            playerBattleImg = img("/res/sprites/player/" + pn + "/" + pn + "_battle.png");
-            playerDialogImg = img("/res/sprites/player/" + pn + "/" + pn + "_dialog.png");
-        }
+        imageDisplay.loadBattleImages(currentMapName, pendingBattleEnemyColor, isFinalBoss,
+                player != null ? player.characterName : null);
+        syncImageState();
         playMusic("battle_sountrack");
 
         // Final boss gets a pre-battle dialogue before the fight begins
         if (isFinalBoss) {
             String playerFirst = (player != null) ? capitalize(player.characterName) : "Player";
-            preBattleLines = new String[]{
-                playerFirst + ": \"Back off! I'm not giving you anything!\"",
-                "Beggar: \"You think you can just walk away? Hand it over — NOW!\"",
-                playerFirst + ": \"You want it? Come and get it then.\"",
-                "Beggar: \"Fine. Don't say I didn't warn you...\"",
-                "— Both of you get into stance. There's no turning back. —"
-            };
+            preBattleLines = DialogueDisplay.finalBossPreBattle(playerFirst);
             preBattleIndex = 0;
             eWasPreBattleHeld = false;
             gameState = preBattleState;
@@ -988,7 +920,8 @@ private Rectangle sfxSliderTrack() {
         }
 
         String pp = pm.name().toLowerCase(), ep = em.name().toLowerCase();
-        outcomeRPSImg = img("/res/gui/pixelart/battle_outcome/" + pp + "_" + ep + ".png");
+        imageDisplay.loadOutcomeImage(pp, ep);
+        syncImageState();
         waitingOutcome = true;
         playSFX("Move_Sound");
         gameState = outcomeState;
@@ -1066,22 +999,11 @@ private Rectangle sfxSliderTrack() {
     private void startNarration() {
         currentMapName = EMALL_MAP;
         // Pre-load the emall battle scene so paintNarration and paintPreBattle both have it
-        battleSceneImg  = img("/res/gui/pixelart/battle_scene/emall_battle.png");
-        outcomeSceneImg = img("/res/gui/pixelart/battle_scene/emall_outcome.png");
+        imageDisplay.loadEmallScenes();
+        syncImageState();
 
         narrating = true; narIndex = 0; eWasNarHeld = false;
-        narLines = new String[]{
-            "After a long day of fighting, you've finally reclaimed every last peso...",
-            "Player: \"Finally... I have all my money back. Jollibee, here I com—\"",
-            "???:     \"Excuse me po, sir...\"",
-            "Player: \"Huh?\"",
-            "Beggar:  \"Sir, pwede po bang makahingi ng barya? Gutom na gutom na po ako.\"",
-            "Player: \"Sorry, I can't. I only have just enough for what I need.\"",
-            "Beggar:  \"...Just enough? No, no. I saw how much you have. Don't lie to me.\"",
-            "Player: \"I'm serious, I don't have anything extra—\"",
-            "Beggar:  \"THEN I'LL TAKE IT FROM YOU!!\"",
-            "The beggar lunges forward. You have no choice but to fight!"
-        };
+        narLines = DialogueDisplay.finalBossNarration();
         currentDialog = narLines[0];
         gameState = narrationState;
     }
@@ -1332,8 +1254,7 @@ private Rectangle sfxSliderTrack() {
         BufferedImage port = null;
         if (lastNPCColor != 0) {
             String f = enemyFolder(lastNPCColor);
-            if (f != null) port = npcDialog.computeIfAbsent(f,
-                k -> img("/res/sprites/enemies/"+k+"/"+k+"_dialog.png"));
+            if (f != null) port = imageDisplay.getNpcDialogImage(f);
         } else if (player != null) {
             port = playerDialogImg;
         }
@@ -1357,9 +1278,6 @@ private Rectangle sfxSliderTrack() {
         g2.setFont(new Font("Arial",Font.ITALIC,16)); g2.setColor(new Color(180,180,180));
         g2.drawString("Press 'E' to continue...", bx+bw-260, by+bh-18);
     }
-
-    // Cached dialog portraits (loaded once per NPC folder)
-    private final Map<String, BufferedImage> npcDialog = new HashMap<>();
 
     private List<String> wrap(Graphics2D g2, String text, int maxW) {
         List<String> out=new ArrayList<>();
@@ -1590,7 +1508,7 @@ private void drawSlider(Graphics2D g2, int x, int y, int w, String label, float 
             fill(g2, mapImage);
         } else if (EMALL_MAP.equals(currentMapName)) {
             // No map image for emall — show the emall battle scene as atmosphere during narration
-            BufferedImage emallBg = img("/res/gui/pixelart/battle_scene/emall_battle.png");
+            BufferedImage emallBg = imageDisplay.getEmallBattleBackground();
             if (emallBg != null) {
                 fill(g2, emallBg);
                 g2.setColor(new Color(0, 0, 0, 120));
@@ -2226,28 +2144,28 @@ private void applyMusicVolume() {
     }
 }
 
-private void debugAudio() {
-    // Test music stream
-    InputStream ms = openMusicStream("menu_sountrack");
-    System.out.println("Music stream: " + (ms != null ? "FOUND" : "NOT FOUND"));
+    private void debugAudio() {
+        // Test music stream
+        InputStream ms = openMusicStream("menu_sountrack");
+        System.out.println("Music stream: " + (ms != null ? "FOUND" : "NOT FOUND"));
 
-    // Test SFX stream
-    InputStream ss = getClass().getResourceAsStream("/res/soundtrack/click.wav");
-    System.out.println("SFX click.wav: " + (ss != null ? "FOUND" : "NOT FOUND"));
+        // Test SFX stream
+        InputStream ss = getClass().getResourceAsStream("/res/soundtrack/click.wav");
+        System.out.println("SFX click.wav: " + (ss != null ? "FOUND" : "NOT FOUND"));
 
-    // Test AudioSystem
-    try {
-        if (ss == null) ss = getClass().getResourceAsStream("/res/soundtrack/click.wav");
-        if (ss != null) {
-            AudioInputStream ais = AudioSystem.getAudioInputStream(new BufferedInputStream(ss));
-            Clip clip = AudioSystem.getClip();
-            clip.open(ais);
-            System.out.println("Clip opened OK, frames: " + clip.getFrameLength());
-            clip.close();
+        // Test AudioSystem
+        try {
+            if (ss == null) ss = getClass().getResourceAsStream("/res/soundtrack/click.wav");
+            if (ss != null) {
+                AudioInputStream ais = AudioSystem.getAudioInputStream(new BufferedInputStream(ss));
+                Clip clip = AudioSystem.getClip();
+                clip.open(ais);
+                System.out.println("Clip opened OK, frames: " + clip.getFrameLength());
+                clip.close();
+            }
+        } catch (Exception e) {
+            System.out.println("Clip error: " + e.getMessage());
+            e.printStackTrace();
         }
-    } catch (Exception e) {
-        System.out.println("Clip error: " + e.getMessage());
-        e.printStackTrace();
     }
-}
 }
