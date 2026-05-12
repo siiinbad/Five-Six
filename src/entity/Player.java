@@ -297,7 +297,10 @@ public class Player extends Entity {
         if (nearInteractable && gp.currentDialog.isEmpty()) {
             g2.setColor(Color.WHITE);
             g2.setFont(new Font("Arial", Font.BOLD, 20));
-            g2.drawString("Press E to talk", x + 10, y - 10);
+            String prompt = "Press E";
+            FontMetrics fm = g2.getFontMetrics();
+            int tx = x + gp.tileSize / 2 - fm.stringWidth(prompt) / 2;
+            g2.drawString(prompt, tx, y - 10);
         }
     }
 }

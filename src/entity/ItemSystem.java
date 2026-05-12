@@ -6,7 +6,7 @@ public class ItemSystem {
 
     public enum Item {
         WATER        ("Water",              "Heals 10% of max HP."),
-        BARNUTS      ("Barnuts",            "Heals 5 HP."),
+        BARNUTS      ("Barnuts",            "Heals 10 HP."),
         GREENCROSS   ("Greencross Alcohol", "Heals 5 HP for 3 rounds, but deals 2 damage on use."),
         COFFEE       ("Coffee",             "Adds 10 max HP permanently."),
         ENERGY_DRINK ("Energy Drink",       "Adds 0.05 to permanent damage multiplier."),
