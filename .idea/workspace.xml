@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="add size change depends on the user resolution(idk it is work)" />
+    <list default="true" id="cd9c1dde-a7ae-4c7a-bb23-47cad8824edf" name="Changes" comment="added new things and fixed error">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/GamePanel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/GamePanel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/ImageDisplay.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/ImageDisplay.java" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -18,17 +22,22 @@
     </option>
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
   &quot;lastFilter&quot;: {}
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/siiinbad/Five-Six.git",
-    "accountId": "9c6b63b8-8039-403b-a22f-44bb59fcd84b"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/siiinbad/Five-Six.git&quot;,
+    &quot;accountId&quot;: &quot;9c6b63b8-8039-403b-a22f-44bb59fcd84b&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 2
 }</component>
@@ -46,12 +55,12 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "Ban",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/johnfiel/IdeaProjects/Five-Six/src/res/sprites/johnfiel",
     "onboarding.tips.debug.path": "C:/Users/Ivan/IdeaProjects/Five-Six/src/Main.java",
-    "project.structure.last.edited": "Modules",
+    "project.structure.last.edited": "Project",
     "project.structure.proportion": "0.15",
     "project.structure.side.proportion": "0.2",
     "settings.editor.selected.configurable": "preferences.pluginManager",
@@ -108,6 +117,7 @@
       <option name="presentableId" value="Default" />
       <updated>1772915913970</updated>
       <workItem from="1778595540937" duration="144000" />
+      <workItem from="1778597931827" duration="4628000" />
     </task>
     <task id="LOCAL-00001" summary="fix the collision to be align inside of the table and turn the hitbox and collision into a transparent">
       <option name="closed" value="true" />
@@ -157,7 +167,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777117964658</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="added new things and fixed error">
+      <option name="closed" value="true" />
+      <created>1778597988012</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1778597988012</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -169,7 +187,8 @@
     <MESSAGE value="fix the code to be working again" />
     <MESSAGE value="fix the interaction of the door to be accurate" />
     <MESSAGE value="add size change depends on the user resolution(idk it is work)" />
-    <option name="LAST_COMMIT_MESSAGE" value="add size change depends on the user resolution(idk it is work)" />
+    <MESSAGE value="added new things and fixed error" />
+    <option name="LAST_COMMIT_MESSAGE" value="added new things and fixed error" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

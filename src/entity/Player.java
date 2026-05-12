@@ -223,7 +223,7 @@ public class Player extends Entity {
         if (color == COLOR_NEXTAREA) {
             if (gp.isGleMap()) {
                 if (gp.enemyStats.isDefeated(COLOR_JOHNRU)) {
-                    gp.loadMapImages(GamePanel.FRONTGATE_MAP);
+                    gp.startMapTransition(GamePanel.FRONTGATE_MAP);
                 } else {
                     gp.currentDialog = DialogueDisplay.nextAreaLocked();
                 }

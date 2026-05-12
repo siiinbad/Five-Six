@@ -24,7 +24,7 @@ public class EnemyStats {
     public int getEnemyHP(int color, int completedFights) {
         int fights = Math.max(0, completedFights);
         if (color == 0xFFFFFF) {
-            return 300 + HP_INC * fights;
+            return 300;
         }
         return BASE_HP + HP_INC * fights;
     }

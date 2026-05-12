@@ -41,9 +41,11 @@ public class ImageDisplay {
     public void loadAll() {
         menuScreenImg = img("/res/gui/pixelart/menu/menu_screen.png");
         logoImg = img("/res/gui/pixelart/menu/fixsix_log.png");
-        creditsImg = firstImg("/res/gui/pixelart/menu/credits_placeholder.png",
+        creditsImg = firstImg("/res/gui/pixelart/menu/credit_screen.png",
+                "/res/gui/pixelart/menu/credits_placeholder.png",
                 "/res/sprites/menu/gui/credits_placeholder.png");
-        winImg = firstImg("/res/gui/pixelart/menu/win_placeholder.png",
+        winImg = firstImg("/res/gui/pixelart/menu/win_screen.png",
+                "/res/gui/pixelart/menu/win_placeholder.png",
                 "/res/sprites/menu/gui/win_placeholder.png");
 
         menuMainHitbox = img("/res/gui/button_hitbox/menu_main_hitbox.png");
