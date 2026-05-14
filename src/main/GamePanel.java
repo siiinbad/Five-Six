@@ -62,6 +62,7 @@ public class GamePanel extends JPanel implements Runnable {
     public static final int preBattleState = 12;
     public static final int narrationState = 13;
     public static final int resultState    = 14;
+    public static final int loadingState   = 15;
 
     // ─────────────────────────────────────────────────────────────
     //  MAP CONSTANTS
@@ -110,6 +111,7 @@ public class GamePanel extends JPanel implements Runnable {
     BufferedImage outcomeRPSImg;
     BufferedImage creditsImg;
     BufferedImage winImg;
+    java.awt.Image loadingScreenGif;
 
     final Map<String, BufferedImage[]> btnImgs      = new HashMap<>();
     final Map<String, BufferedImage>   npcStand     = new HashMap<>();
@@ -170,6 +172,8 @@ public class GamePanel extends JPanel implements Runnable {
     private boolean f1WasHeld   = false;
     private static final int AUTOSAVE_INTERVAL_FRAMES = 180;
     private int autoSaveCountdown = AUTOSAVE_INTERVAL_FRAMES;
+    private long loadingStartedAtMillis;
+    private int loadingDurationMillis;
 
     // ─────────────────────────────────────────────────────────────
     //  CONSTRUCTOR
@@ -190,7 +194,9 @@ public class GamePanel extends JPanel implements Runnable {
         syncImageState();
         audio.debugAudio();
         saveData = SaveData.loadFromDisk();
-        gameState = menuState;
+        gameState = loadingState;
+        loadingStartedAtMillis = System.currentTimeMillis();
+        loadingDurationMillis = imageDisplay.getLoadingScreenDurationMillis();
         audio.playMusic("menu_sountrack");
 
         addMouseListener(new MouseAdapter() {
@@ -233,6 +239,7 @@ public class GamePanel extends JPanel implements Runnable {
         outcomeRPSImg      = imageDisplay.getOutcomeRPSImg();
         creditsImg         = imageDisplay.getCreditsImg();
         winImg             = imageDisplay.getWinImg();
+        loadingScreenGif   = imageDisplay.getLoadingScreenGif();
         btnImgs.clear();      btnImgs.putAll(imageDisplay.getButtonImages());
         npcStand.clear();     npcStand.putAll(imageDisplay.getNpcStandImages());
         charSelectImg.clear();charSelectImg.putAll(imageDisplay.getCharacterSelectImages());
@@ -406,6 +413,13 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void update() {
         if (quitConfirmOpen) return;
+        
+        if (gameState == loadingState) {
+            if (loadingFinished()) {
+                gameState = menuState;
+            }
+            return;
+        }
 
         // Close inventory / ability panel with E key
         if ((gameState == inventoryState || gameState == abilityState)
@@ -462,6 +476,12 @@ public class GamePanel extends JPanel implements Runnable {
             autoSave();
             autoSaveCountdown = AUTOSAVE_INTERVAL_FRAMES;
         }
+    }
+
+    private boolean loadingFinished() {
+        if (loadingScreenGif == null) return true;
+        int duration = Math.max(1000, loadingDurationMillis);
+        return System.currentTimeMillis() - loadingStartedAtMillis >= duration;
     }
 
     // ─────────────────────────────────────────────────────────────
