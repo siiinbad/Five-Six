@@ -348,6 +348,14 @@ public class UIRenderer {
             g2.setFont(pixelFont(Font.ITALIC, 20));
             g2.drawString("No abilities", px + pw / 2 - 55, py + ph / 2);
         }
+        
+        if (!inBattle) {
+            g2.setColor(new Color(244, 210, 154));
+            g2.setFont(pixelFont(Font.BOLD, 18));
+            String msg = "You can't use abilities outside of a battle";
+            g2.drawString(msg, gp.getWidth() / 2 - g2.getFontMetrics().stringWidth(msg) / 2, py - 15);
+        }
+        
         drawPanelContinueHint(g2, px, py, pw, ph);
         drawHoverText(g2, hoverText);
     }
@@ -816,7 +824,7 @@ public class UIRenderer {
     private void drawActiveEffects(Graphics2D g2) {
         List<String> effects = gp.battleMgr.activeEffects();
         if (effects.isEmpty()) return;
-        int w = 260, h = 34 + effects.size() * 24, x = 32, y = 76;
+        int w = 260, h = 34 + effects.size() * 24, x = 40, y = 124;
         drawPopupBox(g2, x, y, w, h);
         g2.setFont(pixelFont(Font.BOLD, 15));
         g2.setColor(new Color(52, 35, 24));
@@ -933,7 +941,7 @@ public class UIRenderer {
 
     private void drawPanelContinueHint(Graphics2D g2, int px, int py, int pw, int ph) {
         String hint = "Press E Or Click Anywhere To Continue";
-        int w = 300, h = 34, x = px + pw - w - 18, y = py + ph - h - 14;
+        int w = 300, h = 34, x = px + 18, y = py + ph - h - 14;
         g2.setColor(popupRow());
         g2.fillRoundRect(x, y, w, h, 8, 8);
         g2.setColor(popupBorder());

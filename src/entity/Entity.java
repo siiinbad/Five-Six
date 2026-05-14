@@ -15,8 +15,9 @@ public abstract class Entity {
     public int spriteNum = 1;
 
     // HP fields
-    public int maxHP;
     public int currentHP;
+
+    public int maxHP;
 
     public void setHP(int maxHP) {
         this.maxHP = maxHP;
