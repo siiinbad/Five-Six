@@ -56,6 +56,7 @@ public class UIRenderer {
             case GamePanel.preBattleState -> paintPreBattle(g2);
             case GamePanel.narrationState -> paintNarration(g2);
             case GamePanel.resultState    -> paintResult(g2);
+            case GamePanel.loadingState   -> paintLoading(g2);
         }
 
         if (gp.bottomNavVisible()) drawBottomNav(g2);
@@ -65,6 +66,18 @@ public class UIRenderer {
     // ─────────────────────────────────────────────────────────────
     //  MENU SCREENS
     // ─────────────────────────────────────────────────────────────
+    private void paintLoading(Graphics2D g2) {
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.getWidth(), gp.getHeight());
+        if (gp.loadingScreenGif != null) {
+            g2.drawImage(gp.loadingScreenGif, 0, 0, gp.getWidth(), gp.getHeight(), gp);
+            return;
+        }
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.BOLD, 40));
+        String text = "LOADING...";
+        g2.drawString(text, gp.getWidth() / 2 - g2.getFontMetrics().stringWidth(text) / 2, gp.getHeight() / 2);
+    }
     private void paintMenu(Graphics2D g2) {
         fill(g2, gp.menuScreenImg);
         if (gp.logoImg != null) {

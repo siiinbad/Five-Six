@@ -1,12 +1,21 @@
 package main;
 
 import java.awt.image.BufferedImage;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import javax.imageio.ImageReader;
 import javax.imageio.ImageIO;
+import javax.imageio.metadata.IIOMetadata;
+import javax.imageio.stream.ImageInputStream;
+import org.w3c.dom.Node;
 
 public class ImageDisplay {
+    private static final String LOADING_SCREEN_GIF = "/res/gui/pixelart/menu/loading_screen.gif";
+    private static final int DEFAULT_LOADING_SCREEN_DURATION_MS = 3000;
 
     private BufferedImage mapImage;
     private BufferedImage hitboxImage;
@@ -27,6 +36,8 @@ public class ImageDisplay {
     private BufferedImage outcomeRPSImg;
     private BufferedImage creditsImg;
     private BufferedImage winImg;
+    private java.awt.Image loadingScreenGif;
+    private int loadingScreenDurationMillis = DEFAULT_LOADING_SCREEN_DURATION_MS;
 
     private final Map<String, BufferedImage[]> btnImgs = new HashMap<>();
     private final Map<String, BufferedImage> npcStand = new HashMap<>();
@@ -39,6 +50,13 @@ public class ImageDisplay {
     private BufferedImage enemyDialogImg;
 
     public void loadAll() {
+        try {
+            URL url = getClass().getResource(LOADING_SCREEN_GIF);
+            if (url != null) {
+                loadingScreenGif = new javax.swing.ImageIcon(url).getImage();
+                loadingScreenDurationMillis = readGifDurationMillis(url);
+            }
+        } catch (Exception e) {}
         menuScreenImg = img("/res/gui/pixelart/menu/menu_screen.png");
         logoImg = img("/res/gui/pixelart/menu/fixsix_log.png");
         creditsImg = firstImg("/res/gui/pixelart/menu/credit_screen.png",
@@ -204,6 +222,8 @@ public class ImageDisplay {
     public BufferedImage getOutcomeRPSImg() { return outcomeRPSImg; }
     public BufferedImage getCreditsImg() { return creditsImg; }
     public BufferedImage getWinImg() { return winImg; }
+    public java.awt.Image getLoadingScreenGif() { return loadingScreenGif; }
+    public int getLoadingScreenDurationMillis() { return loadingScreenDurationMillis; }
     public Map<String, BufferedImage[]> getButtonImages() { return btnImgs; }
     public Map<String, BufferedImage> getNpcStandImages() { return npcStand; }
     public Map<String, BufferedImage> getCharacterSelectImages() { return charSelectImg; }
@@ -230,5 +250,44 @@ public class ImageDisplay {
 
     private void btn(String key, String idle, String hover) {
         btnImgs.put(key, new BufferedImage[]{img(idle), img(hover)});
+    }
+
+    private int readGifDurationMillis(URL url) {
+        Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("gif");
+        if (!readers.hasNext()) return DEFAULT_LOADING_SCREEN_DURATION_MS;
+
+        ImageReader reader = readers.next();
+        try (InputStream input = url.openStream();
+             ImageInputStream stream = ImageIO.createImageInputStream(input)) {
+            reader.setInput(stream, false);
+            int totalMillis = 0;
+            int frameCount = reader.getNumImages(true);
+            for (int i = 0; i < frameCount; i++) {
+                IIOMetadata metadata = reader.getImageMetadata(i);
+                Node root = metadata.getAsTree("javax_imageio_gif_image_1.0");
+                Node graphicsControl = findNode(root, "GraphicControlExtension");
+                if (graphicsControl == null) continue;
+
+                Node delay = graphicsControl.getAttributes().getNamedItem("delayTime");
+                if (delay != null) {
+                    totalMillis += Math.max(1, Integer.parseInt(delay.getNodeValue())) * 10;
+                }
+            }
+            return totalMillis > 0 ? totalMillis : DEFAULT_LOADING_SCREEN_DURATION_MS;
+        } catch (Exception e) {
+            return DEFAULT_LOADING_SCREEN_DURATION_MS;
+        } finally {
+            reader.dispose();
+        }
+    }
+
+    private Node findNode(Node node, String name) {
+        if (node == null) return null;
+        if (name.equals(node.getNodeName())) return node;
+        for (Node child = node.getFirstChild(); child != null; child = child.getNextSibling()) {
+            Node found = findNode(child, name);
+            if (found != null) return found;
+        }
+        return null;
     }
 }
