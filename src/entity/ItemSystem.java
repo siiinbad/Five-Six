@@ -2,7 +2,7 @@ package entity;
 
 import java.util.*;
 
-public class ItemSystem {
+public class ItemSystem implements IItemSystem {
 
     public enum Item {
         WATER        ("Water",              "Heals 10% of max HP."),
@@ -20,6 +20,7 @@ public class ItemSystem {
     // Stacked inventory: item -> count
     private final Map<Item, Integer> inventory = new LinkedHashMap<>();
 
+    @Override
     public Item addRandom(Random rand) {
         int roll = rand.nextInt(123);
         Item item;
@@ -34,19 +35,25 @@ public class ItemSystem {
     }
 
     /** Remove one of the given item */
+    @Override
     public void remove(Item item) {
         int count = inventory.getOrDefault(item, 0);
         if (count <= 1) inventory.remove(item);
         else inventory.put(item, count - 1);
     }
 
+    @Override
     public int count(Item item)   { return inventory.getOrDefault(item, 0); }
+    
+    @Override
     public boolean isEmpty()      { return inventory.isEmpty(); }
 
     /** Returns list of unique items that have at least 1 in stock */
+    @Override
     public List<Item> getItems()  { return new ArrayList<>(inventory.keySet()); }
 
     /** For save/load: get full flat list */
+    @Override
     public List<Item> getFlatList() {
         List<Item> out = new ArrayList<>();
         for (Map.Entry<Item,Integer> e : inventory.entrySet())
@@ -55,6 +62,7 @@ public class ItemSystem {
     }
 
     /** For save/load: restore from flat list */
+    @Override
     public void setItems(List<Item> items) {
         inventory.clear();
         for (Item it : items) inventory.merge(it, 1, Integer::sum);

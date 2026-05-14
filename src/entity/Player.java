@@ -65,6 +65,7 @@ public class Player extends Entity {
         return ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(path)));
     }
 
+    @Override
     public void update() {
         if (gp.gameState == GamePanel.battleState || gp.gameState == GamePanel.fadeState) return;
         int nx = x, ny = y;
@@ -275,6 +276,7 @@ public class Player extends Entity {
         gp.currentDialog = DialogueDisplay.enemyDialogue(c, gp.dialogStage, characterName);
     }
 
+    @Override
     public void draw(Graphics2D g2) {
         boolean moving = keyH.upPressed || keyH.downPressed || keyH.leftPressed || keyH.rightPressed;
         BufferedImage im = switch (direction) {

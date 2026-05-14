@@ -20,7 +20,7 @@ public class SaveData implements Serializable {
     public int    completedFights = 0;
 
     public Set<Integer> defeatedEnemies = new HashSet<>();
-    public List<ItemSystem.Item> items = new ArrayList<>();              // flat list
+    public List<ItemSystem.Item> items = new ArrayList<>();
     public List<AbilitySystem.Ability> abilities = new ArrayList<>();
 
     public long lastSavedAtMs = 0L;
