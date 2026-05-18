@@ -46,7 +46,7 @@ public class InputRouter {
             case GamePanel.battleState    -> battleClick(colorAt(gp.battleHitbox, p), p);
             case GamePanel.outcomeState   -> { if (colorAt(gp.outcomeHitbox, p) == BC_CONTBAT) gp.battleMgr.nextRound(); }
             case GamePanel.creditsState   -> gp.gameState = GamePanel.menuState;
-            case GamePanel.winState       -> gp.resetToMenu();
+            case GamePanel.winState       -> gp.completeReset();
             case GamePanel.loseState      -> gp.resetToMenu();
             case GamePanel.resultState    -> resultClick(p);
         }

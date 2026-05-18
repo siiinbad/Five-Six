@@ -151,6 +151,14 @@ public class BattleManager {
 
         if (ctx.isFinalBoss && won) {
             saveFinalBossCheckpoint();
+            gp.speedrunTimer.stop();
+            
+            // Don't record John Fiel runs
+            if (gp.player != null && !"johnfiel".equalsIgnoreCase(gp.player.characterName)) {
+                gp.leaderboard.addTime(gp.speedrunTimer.getElapsedMs());
+            }
+            
+            gp.speedrunTimer.saveToDisk();
             gp.audio.stopMusic();
             gp.audio.playSFX("Win_Final_Boss");
             gp.gameState = GamePanel.winState;
@@ -166,6 +174,10 @@ public class BattleManager {
             gp.saveData = null;
             new java.io.File(System.getProperty("user.home")
                     + java.io.File.separator + "fivesix_save.dat").delete();
+
+            // Reset timer on total loss
+            gp.speedrunTimer.reset();
+
             gp.gameState = GamePanel.loseState;
             return;
         }

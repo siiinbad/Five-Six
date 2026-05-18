@@ -87,6 +87,8 @@ public class GamePanel extends JPanel implements Runnable {
     final NarrationManager narMgr     = new NarrationManager();
           UIRenderer       renderer;   // set after construction to pass `this`
           InputRouter      inputRouter;
+    public final SpeedrunTimer speedrunTimer = new SpeedrunTimer();
+    public final Leaderboard   leaderboard   = new Leaderboard();
 
     // ─────────────────────────────────────────────────────────────
     //  IMAGE STATE  (package-private — UIRenderer reads, InputRouter touches rects)
@@ -194,6 +196,8 @@ public class GamePanel extends JPanel implements Runnable {
         syncImageState();
         audio.debugAudio();
         saveData = SaveData.loadFromDisk();
+        leaderboard.loadFromDisk();
+        speedrunTimer.loadFromDisk();
         gameState = loadingState;
         loadingStartedAtMillis = System.currentTimeMillis();
         loadingDurationMillis = imageDisplay.getLoadingScreenDurationMillis();
@@ -285,6 +289,7 @@ public class GamePanel extends JPanel implements Runnable {
                 new ArrayList<>(abilities.getAbilities()),
                 completedFights);
         saveData.saveToDisk();
+        speedrunTimer.saveToDisk();
     }
 
     void loadSave() {
@@ -304,6 +309,7 @@ public class GamePanel extends JPanel implements Runnable {
         player.damageMultiplier = saveData.damageMultiplier;
         repairPlayerHpBounds();
         setPlayerSpawn();
+        speedrunTimer.loadFromDisk();
         gameState = playState;
     }
 
@@ -311,12 +317,14 @@ public class GamePanel extends JPanel implements Runnable {
     //  CHARACTER SELECT
     // ─────────────────────────────────────────────────────────────
     public void selectChar(String name) {
-        enemyStats      = new EnemyStats();
-        items           = new ItemSystem();
-        abilities       = new AbilitySystem();
+        completeReset();
+        
+        enemyStats = new EnemyStats();
+        items = new ItemSystem();
+        abilities = new AbilitySystem();
         completedFights = 0;
         loadMapImages(GLE_MAP);
-        player          = new Player(this, keyH, name);
+        player = new Player(this, keyH, name);
         loadPlayerDialogImages();
         setPlayerSpawn();
         gameState = playState;
@@ -412,6 +420,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void update() {
+        speedrunTimer.tick(gameState);
         if (quitConfirmOpen) return;
         
         if (gameState == loadingState) {
@@ -506,6 +515,7 @@ public class GamePanel extends JPanel implements Runnable {
         abilities       = new AbilitySystem();
         completedFights = 0;
         saveData        = SaveData.loadFromDisk();
+        speedrunTimer.saveToDisk();
         gameState       = menuState;
         audio.playMusic("menu_sountrack");
     }
@@ -516,6 +526,30 @@ public class GamePanel extends JPanel implements Runnable {
         settingsOpen      = false;
     }
 
+    public void completeReset() {
+        speedrunTimer.stop();
+        speedrunTimer.reset();
+        
+        if (saveData != null) {
+            new java.io.File(System.getProperty("user.home") 
+                + java.io.File.separator + "fivesix_save.dat").delete();
+        }
+        saveData = null;
+        
+        enemyStats = new EnemyStats();
+        items = new ItemSystem();
+        abilities = new AbilitySystem();
+        completedFights = 0;
+        player = null;
+        battleMgr.ctx.reset();
+        currentDialog = "";
+        dialogStage = 0;
+        lastNPCColor = 0;
+        gameState = menuState;
+        audio.stopMusic();
+        audio.playMusic("menu_sountrack");
+        autoSave();
+    }
     // ─────────────────────────────────────────────────────────────
     //  HP REPAIR  (called by BattleManager)
     // ─────────────────────────────────────────────────────────────

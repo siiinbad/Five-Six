@@ -89,6 +89,7 @@ public class UIRenderer {
         drawBtn(g2, gp.menuMainHitbox, BC_QUIT,   "quit");
         drawMenuSettingsButton(g2);
         if (gp.settingsOpen) paintSettingsPanel(g2);
+        drawLeaderboardOnMenu(g2);
     }
 
     private void paintMenuStart(Graphics2D g2) {
@@ -98,6 +99,7 @@ public class UIRenderer {
         drawBtn(g2, gp.menuStartHitbox, BC_SELCHAR,  "selchar");
         drawBtn(g2, gp.menuStartHitbox, BC_SETTINGS, "settings");
         if (gp.settingsOpen) paintSettingsPanel(g2);
+        drawLeaderboardOnMenu(g2);
     }
 
     private void paintCharSelect(Graphics2D g2) {
@@ -169,6 +171,8 @@ public class UIRenderer {
         paintWorldGUI(g2);
         if (!gp.currentDialog.isEmpty()) dialog(g2, gp.currentDialog);
         if (gp.settingsOpen) paintSettingsPanel(g2);
+
+        drawUnifiedTimer(g2);
     }
 
     private void paintWorldGUI(Graphics2D g2) {
@@ -249,11 +253,17 @@ public class UIRenderer {
             }
         }
 
+        // Player stats section
         if (gp.player != null) {
-            hpBar(g2, 40, 30, 300, 22, gp.player.currentHP, gp.player.maxHP, gp.player.characterName);
-            damageMultiplierBox(g2, 40, 84, 300, gp.player.damageMultiplier);
+            hpBar(g2, 40, 20, 280, 22, gp.player.currentHP, gp.player.maxHP, gp.player.characterName);
+            damageMultiplierBox(g2, 40, 74, 280, gp.player.damageMultiplier);
+            // Timer drawn right here, beside the HP bar
+            drawUnifiedTimer(g2);
         }
+        
         drawBattleHeader(g2);
+        
+        // Enemy stats section
         int ehx = gp.getWidth() - 360;
         hpBar(g2, ehx, 30, 300, 22, bc.enemyHP, bc.enemyMaxHP, bc.enemyName);
         damageMultiplierBox(g2, ehx, 84, 300, bc.enemyDamageMultiplier);
@@ -279,6 +289,7 @@ public class UIRenderer {
         }
         drawBtn(g2, gp.outcomeHitbox, BC_CONTBAT, "contbat");
         drawOutcomePanel(g2);
+        drawUnifiedTimer(g2);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -380,28 +391,70 @@ public class UIRenderer {
         if (gp.winImg != null) { fill(g2, gp.winImg); }
         else { g2.setColor(new Color(198, 158, 104)); g2.fillRect(0, 0, gp.getWidth(), gp.getHeight()); }
 
-        int bw = Math.min(gp.getWidth() - 160, 820), bh = 230;
-        int bx = gp.getWidth() / 2 - bw / 2, by = gp.getHeight() - bh - 54;
+        // Leaderboard panel (left side)
+        List<Long> times = gp.leaderboard.getTimes();
+        long myTime = gp.speedrunTimer.getElapsedMs();
+        int lbW = 320, lbH = 58 + Math.max(1, times.size()) * 30 + 16;
+        int lbX = 36, lbY = gp.getHeight() / 2 - lbH / 2;
+        drawPopupBox(g2, lbX, lbY, lbW, lbH);
+
+        g2.setColor(new Color(52, 35, 24));
+        g2.setFont(pixelFont(Font.BOLD, 20));
+        String lbTitle = "FASTEST RUNS";
+        g2.drawString(lbTitle, lbX + lbW / 2 - g2.getFontMetrics().stringWidth(lbTitle) / 2, lbY + 32);
+        g2.setColor(new Color(112, 83, 54, 120));
+        g2.setStroke(new BasicStroke(1f));
+        g2.drawLine(lbX + 16, lbY + 42, lbX + lbW - 16, lbY + 42);
+
+        int ry = lbY + 64;
+        g2.setFont(pixelFont(Font.BOLD, 16));
+        for (int i = 0; i < times.size(); i++) {
+            boolean isThisRun = (times.get(i) == myTime);
+            g2.setColor(isThisRun ? new Color(255, 210, 50) : new Color(52, 35, 24));
+            g2.drawString(String.format("#%-2d  %s%s", i + 1,
+                    SpeedrunTimer.format(times.get(i)), isThisRun ? "  \u25c4" : ""), lbX + 18, ry);
+            ry += 30;
+        }
+        if (times.isEmpty()) {
+            g2.setColor(new Color(80, 56, 38));
+            g2.setFont(pixelFont(Font.ITALIC, 15));
+            g2.drawString("No runs yet", lbX + lbW / 2 - 40, ry);
+        }
+
+        // Congratulations panel (bottom centre)
+        int bw = Math.min(gp.getWidth() - 160, 820), bh = 260;
+        int bx = gp.getWidth() / 2 - bw / 2, by = gp.getHeight() - bh - 50;
         drawPopupBox(g2, bx, by, bw, bh);
 
         g2.setColor(new Color(52, 35, 24));
         g2.setFont(pixelFont(Font.BOLD, 34));
-        String title = "CONGRATULATIONS!";
-        g2.drawString(title, bx + bw / 2 - g2.getFontMetrics().stringWidth(title) / 2, by + 48);
+        String congrats = "CONGRATULATIONS!";
+        g2.drawString(congrats, bx + bw / 2 - g2.getFontMetrics().stringWidth(congrats) / 2, by + 48);
         g2.setColor(new Color(112, 83, 54, 120));
         g2.setStroke(new BasicStroke(1f));
         g2.drawLine(bx + 24, by + 62, bx + bw - 24, by + 62);
 
-        g2.setColor(new Color(80, 56, 38));
-        g2.setFont(pixelFont(Font.BOLD, 18));
-        String msg = "After collecting all your money back and defeating the mysterious person "
-                   + "you finally get to enjoy your long awaited Jolibee meal!";
-        int msgY = by + 98;
-        for (String line : wrap(g2, msg, bw - 56)) { g2.drawString(line, bx + 28, msgY); msgY += 28; }
+        boolean isPB = gp.leaderboard.isPersonalBest(myTime);
+        g2.setColor(new Color(255, 200, 50));
+        g2.setFont(pixelFont(Font.BOLD, 20));
+        String timeLabel = "YOUR TIME:  " + SpeedrunTimer.format(myTime) + (isPB ? "  \u2605 BEST!" : "");
+        g2.drawString(timeLabel, bx + bw / 2 - g2.getFontMetrics().stringWidth(timeLabel) / 2, by + 96);
 
-        g2.setFont(pixelFont(Font.ITALIC, 15));
+        g2.setColor(new Color(112, 83, 54, 80));
+        g2.setStroke(new BasicStroke(1f));
+        g2.drawLine(bx + 24, by + 108, bx + bw - 24, by + 108);
+
+        g2.setColor(new Color(80, 56, 38));
+        g2.setFont(pixelFont(Font.BOLD, 17));
+        String msg = "After collecting all your money back and defeating the mysterious person "
+                + "you finally get to enjoy your long awaited Jolibee meal!";
+        int msgY = by + 132;
+        for (String line : wrap(g2, msg, bw - 56)) { g2.drawString(line, bx + 28, msgY); msgY += 26; }
+
+        g2.setFont(pixelFont(Font.ITALIC, 14));
+        g2.setColor(new Color(80, 56, 38));
         String prompt = "Click anywhere to return to the main menu";
-        g2.drawString(prompt, bx + bw / 2 - g2.getFontMetrics().stringWidth(prompt) / 2, by + bh - 28);
+        g2.drawString(prompt, bx + bw / 2 - g2.getFontMetrics().stringWidth(prompt) / 2, by + bh - 18);
     }
 
     private void paintLose(Graphics2D g2) {
@@ -608,6 +661,7 @@ public class UIRenderer {
         g2.setColor(new Color(80, 56, 38));
         String prompt = gp.narMgr.preBatIsLast() ? "Press 'E' to begin the battle!" : "Press 'E' to continue...";
         g2.drawString(prompt, bx + bw - 280, by + bh - 18);
+        drawUnifiedTimer(g2);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -1096,6 +1150,110 @@ public class UIRenderer {
         }
         if (w == Integer.MAX_VALUE || h == Integer.MAX_VALUE) return new Dimension(1, 1);
         return new Dimension(w, h);
+    }
+
+    private void drawUnifiedTimer(Graphics2D g2) {
+        // Don't show timer on menu screens
+        if (gp.gameState == GamePanel.menuState || 
+            gp.gameState == GamePanel.menuStartState || 
+            gp.gameState == GamePanel.menuCharState ||
+            gp.gameState == GamePanel.loadingState ||
+            gp.gameState == GamePanel.creditsState ||
+            gp.gameState == GamePanel.winState ||
+            gp.gameState == GamePanel.loseState) {
+            return;
+        }
+        
+        String timerStr = "⏱ " + gp.speedrunTimer.formatCurrent();
+        
+        // Default position (for states without HP bar)
+        int hpBarX = 20;
+        int hpBarWidth = 220;
+        int timerY = 20;
+        int fontSize = 14;
+        
+        // Adjust based on game state
+        switch (gp.gameState) {
+            case GamePanel.playState:
+                hpBarX = 20;
+                hpBarWidth = 220;
+                timerY = 20;
+                fontSize = 14;
+                break;
+            case GamePanel.battleState:
+            case GamePanel.outcomeState:
+            case GamePanel.preBattleState:
+            case GamePanel.narrationState:
+            case GamePanel.resultState:
+            case GamePanel.fadeState:
+                hpBarX = 40;
+                hpBarWidth = 280;
+                timerY = 20;
+                fontSize = 16;
+                break;
+        }
+        
+        // Position timer right after the HP bar
+        int tbx = hpBarX + hpBarWidth + 15;
+        int tby = timerY;
+        
+        g2.setFont(new Font("Monospaced", Font.BOLD, fontSize));
+        FontMetrics tfm = g2.getFontMetrics();
+        int tw = tfm.stringWidth(timerStr);
+        int tpad = 10;
+        int tbh = fontSize + 12;
+        
+        // Draw timer background
+        g2.setColor(new Color(0, 0, 0, 200));
+        g2.fillRoundRect(tbx, tby, tw + tpad * 2, tbh, 8, 8);
+        
+        // Draw timer border
+        g2.setColor(new Color(180, 140, 40, 220));
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(tbx, tby, tw + tpad * 2, tbh, 8, 8);
+        
+        // Draw timer text
+        g2.setColor(new Color(255, 220, 80));
+        g2.drawString(timerStr, tbx + tpad, tby + tbh - 6);
+    }
+
+    private void drawLeaderboardOnMenu(Graphics2D g2) {
+        List<Long> times = gp.leaderboard.getTimes();
+        if (times.isEmpty()) return;
+        
+        int lbW = 300, lbH = 58 + Math.min(10, times.size()) * 32 + 20;
+        // Center vertically on right side
+        int lbX = gp.getWidth() - lbW - 40;
+        int lbY = (gp.getHeight() - lbH) / 2;  // Centered vertically
+        
+        drawPopupBox(g2, lbX, lbY, lbW, lbH);
+        
+        g2.setColor(new Color(52, 35, 24));
+        g2.setFont(pixelFont(Font.BOLD, 20));
+        String lbTitle = "★ FASTEST RUNS ★";
+        g2.drawString(lbTitle, lbX + lbW / 2 - g2.getFontMetrics().stringWidth(lbTitle) / 2, lbY + 32);
+        
+        g2.setColor(new Color(112, 83, 54, 120));
+        g2.setStroke(new BasicStroke(1f));
+        g2.drawLine(lbX + 20, lbY + 44, lbX + lbW - 20, lbY + 44);
+        
+        int ry = lbY + 68;
+        g2.setFont(pixelFont(Font.BOLD, 15));
+        for (int i = 0; i < Math.min(10, times.size()); i++) {
+            // Highlight top 3 with medals
+            String prefix;
+            Color color;
+            switch (i) {
+                case 0: prefix = "🥇 "; color = new Color(255, 215, 0); break;
+                case 1: prefix = "🥈 "; color = new Color(192, 192, 192); break;
+                case 2: prefix = "🥉 "; color = new Color(205, 127, 50); break;
+                default: prefix = "   "; color = new Color(52, 35, 24);
+            }
+            g2.setColor(color);
+            g2.drawString(String.format("%s#%-2d  %s", prefix, i + 1, SpeedrunTimer.format(times.get(i))), 
+                        lbX + 20, ry);
+            ry += 32;
+        }
     }
 
     // ─────────────────────────────────────────────────────────────
