@@ -12,7 +12,7 @@ set "SOURCES="
 for %%F in ("%ROOT%src\entity\*.java") do call set "SOURCES=%%SOURCES%% "%%~fF""
 for %%F in ("%ROOT%src\main\*.java") do call set "SOURCES=%%SOURCES%% "%%~fF""
 
-"%JAVAC%" --release 17 -cp "%CP%" -d "%ROOT%bin" %SOURCES%
+"%JAVAC%" --release 17 -encoding UTF-8 -cp "%CP%" -d "%ROOT%bin" %SOURCES%
 if errorlevel 1 exit /b 1
 
 echo Build OK. Output: %ROOT%bin

@@ -132,6 +132,7 @@ public class GamePanel extends JPanel implements Runnable {
     int    hoveredCharColor = 0;
 
     boolean settingsOpen     = false;
+    public boolean leaderboardOpen = false;
     boolean quitConfirmOpen  = false;
     boolean quitConfirmToMenu = false;
 
@@ -648,6 +649,14 @@ public class GamePanel extends JPanel implements Runnable {
         int y = 309 * getHeight() / 342;
         int w = Math.max(1, 62 * getWidth()  / 500);
         int h = Math.max(1, 22 * getHeight() / 342);
+        return new Rectangle(x, y, w, h);
+    }
+
+    public Rectangle menuLeaderboardBtnRect() {
+        int w = 200;
+        int h = 40;
+        int x = getWidth() - w - 24;
+        int y = 24;
         return new Rectangle(x, y, w, h);
     }
 

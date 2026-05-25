@@ -89,7 +89,9 @@ public class UIRenderer {
         drawBtn(g2, gp.menuMainHitbox, BC_QUIT,   "quit");
         drawMenuSettingsButton(g2);
         if (gp.settingsOpen) paintSettingsPanel(g2);
-        drawLeaderboardOnMenu(g2);
+        
+        drawTextButton(g2, gp.menuLeaderboardBtnRect(), "LEADERBOARD");
+        if (gp.leaderboardOpen) drawLeaderboardOnMenu(g2);
     }
 
     private void paintMenuStart(Graphics2D g2) {
@@ -99,7 +101,9 @@ public class UIRenderer {
         drawBtn(g2, gp.menuStartHitbox, BC_SELCHAR,  "selchar");
         drawBtn(g2, gp.menuStartHitbox, BC_SETTINGS, "settings");
         if (gp.settingsOpen) paintSettingsPanel(g2);
-        drawLeaderboardOnMenu(g2);
+        
+        drawTextButton(g2, gp.menuLeaderboardBtnRect(), "LEADERBOARD");
+        if (gp.leaderboardOpen) drawLeaderboardOnMenu(g2);
     }
 
     private void paintCharSelect(Graphics2D g2) {
@@ -392,9 +396,9 @@ public class UIRenderer {
         else { g2.setColor(new Color(198, 158, 104)); g2.fillRect(0, 0, gp.getWidth(), gp.getHeight()); }
 
         // Leaderboard panel (left side)
-        List<Long> times = gp.leaderboard.getTimes();
+        List<Leaderboard.Entry> entries = gp.leaderboard.getEntries();
         long myTime = gp.speedrunTimer.getElapsedMs();
-        int lbW = 320, lbH = 58 + Math.max(1, times.size()) * 30 + 16;
+        int lbW = 320, lbH = 58 + Math.max(1, entries.size()) * 30 + 16;
         int lbX = 36, lbY = gp.getHeight() / 2 - lbH / 2;
         drawPopupBox(g2, lbX, lbY, lbW, lbH);
 
@@ -408,14 +412,15 @@ public class UIRenderer {
 
         int ry = lbY + 64;
         g2.setFont(pixelFont(Font.BOLD, 16));
-        for (int i = 0; i < times.size(); i++) {
-            boolean isThisRun = (times.get(i) == myTime);
+        for (int i = 0; i < entries.size(); i++) {
+            Leaderboard.Entry entry = entries.get(i);
+            boolean isThisRun = (entry.time() == myTime);
             g2.setColor(isThisRun ? new Color(255, 210, 50) : new Color(52, 35, 24));
-            g2.drawString(String.format("#%-2d  %s%s", i + 1,
-                    SpeedrunTimer.format(times.get(i)), isThisRun ? "  \u25c4" : ""), lbX + 18, ry);
+            g2.drawString(String.format("#%-2d  %s  %s%s", i + 1,
+                    SpeedrunTimer.format(entry.time()), entry.name(), isThisRun ? "  \u25c4" : ""), lbX + 18, ry);
             ry += 30;
         }
-        if (times.isEmpty()) {
+        if (entries.isEmpty()) {
             g2.setColor(new Color(80, 56, 38));
             g2.setFont(pixelFont(Font.ITALIC, 15));
             g2.drawString("No runs yet", lbX + lbW / 2 - 40, ry);
@@ -1218,10 +1223,10 @@ public class UIRenderer {
     }
 
     private void drawLeaderboardOnMenu(Graphics2D g2) {
-        List<Long> times = gp.leaderboard.getTimes();
-        if (times.isEmpty()) return;
+        List<Leaderboard.Entry> entries = gp.leaderboard.getEntries();
+        if (entries.isEmpty()) return;
         
-        int lbW = 300, lbH = 58 + Math.min(10, times.size()) * 32 + 20;
+        int lbW = 300, lbH = 58 + Math.min(10, entries.size()) * 32 + 20;
         // Center vertically on right side
         int lbX = gp.getWidth() - lbW - 40;
         int lbY = (gp.getHeight() - lbH) / 2;  // Centered vertically
@@ -1239,7 +1244,8 @@ public class UIRenderer {
         
         int ry = lbY + 68;
         g2.setFont(pixelFont(Font.BOLD, 15));
-        for (int i = 0; i < Math.min(10, times.size()); i++) {
+        for (int i = 0; i < Math.min(10, entries.size()); i++) {
+            Leaderboard.Entry entry = entries.get(i);
             // Highlight top 3 with medals
             String prefix;
             Color color;
@@ -1250,8 +1256,9 @@ public class UIRenderer {
                 default: prefix = "   "; color = new Color(52, 35, 24);
             }
             g2.setColor(color);
-            g2.drawString(String.format("%s#%-2d  %s", prefix, i + 1, SpeedrunTimer.format(times.get(i))), 
-                        lbX + 20, ry);
+            String entryText = String.format("%s#%-2d  %s  %s", prefix, i + 1, 
+                                            SpeedrunTimer.format(entry.time()), entry.name());
+            g2.drawString(entryText, lbX + 20, ry);
             ry += 32;
         }
     }

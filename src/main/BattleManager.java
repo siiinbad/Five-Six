@@ -155,7 +155,16 @@ public class BattleManager {
             
             // Don't record John Fiel runs
             if (gp.player != null && !"johnfiel".equalsIgnoreCase(gp.player.characterName)) {
-                gp.leaderboard.addTime(gp.speedrunTimer.getElapsedMs());
+                String defaultName = BattleManager.cap(gp.player.characterName);
+                String playerName = javax.swing.JOptionPane.showInputDialog(gp, 
+                    "Congratulations! Enter your name for the Leaderboard:", 
+                    defaultName);
+                if (playerName == null || playerName.trim().isEmpty()) {
+                    playerName = defaultName;
+                } else {
+                    playerName = playerName.trim();
+                }
+                gp.leaderboard.addTime(playerName, gp.speedrunTimer.getElapsedMs());
             }
             
             gp.speedrunTimer.saveToDisk();

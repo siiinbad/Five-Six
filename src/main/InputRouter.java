@@ -27,6 +27,12 @@ public class InputRouter {
         if (gp.quitConfirmOpen) { quitConfirmClick(p); return; }
         if (gp.settingsOpen)    { settingsClick(p);     return; }
 
+        if ((gp.gameState == GamePanel.menuState || gp.gameState == GamePanel.menuStartState)
+                && gp.menuLeaderboardBtnRect().contains(p)) {
+            gp.leaderboardOpen = !gp.leaderboardOpen;
+            return;
+        }
+
         if ((gp.gameState == GamePanel.menuState || gp.gameState == GamePanel.menuCharState)
                 && gp.fixedMenuSettingsRect().contains(p)) {
             gp.settingsOpen = true; return;
@@ -64,6 +70,9 @@ public class InputRouter {
         } else if ((gp.gameState == GamePanel.menuState || gp.gameState == GamePanel.menuCharState)
                 && gp.fixedMenuSettingsRect().contains(gp.mouse)) {
             gp.hoveredBtn = "settings";
+        } else if ((gp.gameState == GamePanel.menuState || gp.gameState == GamePanel.menuStartState)
+                && gp.menuLeaderboardBtnRect().contains(gp.mouse)) {
+            gp.hoveredBtn = "leaderboard";
         } else if (gp.gameState == GamePanel.menuCharState) {
             String ch = gp.charButtonAt(gp.mouse);
             if (ch != null) {
@@ -198,8 +207,9 @@ public class InputRouter {
 
     private void resultClick(Point p) {
         if (!gp.battleMgr.ctx.battleResolved) return;
-        if (gp.player.currentHP <= 0) gp.player.respawnWithPenalty();
-        if (gp.pendingBattleEnemyColor == HitboxColors.Map.COLOR_VAUGHN && gp.player.currentHP > 0) {
+        boolean wasDefeated = gp.player.currentHP <= 0;
+        if (wasDefeated) gp.player.respawnWithPenalty();
+        if (gp.pendingBattleEnemyColor == HitboxColors.Map.COLOR_VAUGHN && !wasDefeated) {
             gp.startNarration(); return;
         }
         gp.gameState     = GamePanel.playState;
